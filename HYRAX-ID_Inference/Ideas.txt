@@ -1,0 +1,5 @@
+TODO LIST:
+1. Add denoiser to Hyrax-ID then talk with Saba/Alrieza about UI,UX
+2. Add Descimanitive Learning to classifier? Trick with negative examples through backwards function!?
+Elmar: take a Bout from Animal A but give it label b. then tell the machine to lower the performance of the weights instead of increasing it.
+Basically give it false examples and tell it this is false, reduce perfromance... to increase performance !? ask Chatgpt wtf this means.
