@@ -20,11 +20,11 @@ from torch.utils.data import WeightedRandomSampler
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-TRAIN_DIR = "C:/PHD/SideProjects/Vlad214/DATASET/Stratified_pt_ORG/train"
-VAL_DIR   = "C:/PHD/SideProjects/Vlad214/DATASET/Stratified_pt_ORG/val"
-TEST_DIR  = "C:/PHD/SideProjects/Vlad214/DATASET/Stratified_pt_ORG/test"
+TRAIN_DIR = "C:/PHD/SideProjects/Vlad214/DATASET/7-13_David/train"
+VAL_DIR   = "C:/PHD/SideProjects/Vlad214/DATASET/7-13_David/val"
+TEST_DIR  = "C:/PHD/SideProjects/Vlad214/DATASET/7-13_David/test"
 
-MODELOUTPUT = "C:/PHD/SideProjects/Vlad214/MODEL/TDNN/TEST_MHA/"
+MODELOUTPUT = "C:/PHD/Hyrax-ID_app/HYRAX-ID_Inference/Tdnn/7-13_David_MHA/"
 
 CHECKPOINT_PATH = os.path.join(MODELOUTPUT, "checkpoint.pt")
 BEST_MODEL_PATH = os.path.join(MODELOUTPUT, "best_model.pt")
@@ -32,6 +32,9 @@ BEST_MODEL_PATH = os.path.join(MODELOUTPUT, "best_model.pt")
 os.makedirs(MODELOUTPUT, exist_ok=True)
 
 NUM_CLASSES = 18
+class_list = sorted(
+    ['J9', 'Kashtan', 'M0', 'M9', 'O1', 'O7', 'P0', 'P1', 'P8', 'Q7', 'R3', 'T0', 'T1', 'T9', 'U7', 'U9', 'W4', 'X0']
+)
 
 BATCH_SIZE = 1
 
@@ -339,7 +342,6 @@ def main():
     # -------------------------
     print("\n===== CLASSIFICATION REPORT =====")
 
-    class_list = sorted([ 'J9', 'Kashtan', 'M0', 'M9', 'O1', 'O7', 'P0', 'P1', 'P8', 'Q7', 'R3', 'T0', 'T1', 'T9', 'U7', 'U9', 'W4', 'X0' ])
     #['R1', 'SN', 'T5', 'T6']
 
     report = classification_report(
