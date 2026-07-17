@@ -1,5 +1,20 @@
 TODO LIST:
 1. Add denoiser to Hyrax-ID then talk with Saba/Alrieza about UI,UX
+//Denoiser Done, Github Set, Talk with Saba/alireza
+
 2. Add Descimanitive Learning to classifier? Trick with negative examples through backwards function!?
 Elmar: take a Bout from Animal A but give it label b. then tell the machine to lower the performance of the weights instead of increasing it.
 Basically give it false examples and tell it this is false, reduce perfromance... to increase performance !? ask Chatgpt wtf this means.
+//NOPE Cluster Later
+
+3. Countersongs Heloise
+
+PAPER:
+1. Combine Vlad214 and Heloise paired.
+2. Analyse Years and Location. best grouping for Classification other 3 groupings for YOLO
+3. Test YOLO Noise Denoised with ANIMAL-CLEAN and Biodenoiser. Animal Clean better skip Biodenoiser later.
+4. Test Classification on 3 settings. Original vs denoised. YOLO vs GT, Stratified Random vs file based temporal
+5. Correlate. Is what better and why, how much deteriorate due to GT, problem with denoise vs original, Stratified vs file based temporal.
+
+Present Current Pipeline. New Pipeline Ideas Later.
+

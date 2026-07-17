@@ -708,7 +708,7 @@ def main(gt_folder, pred_folder):
 
 
 if __name__ == "__main__":
-    GT_FOLDER = "C:/PHD/SideProjectsData/HeloiseNewDownload/male_songs_combined_paired/Labels_BT/"
-    PRED_FOLDER = "C:/PHD/SideProjectsData/HeloiseNewDownload/male_songs_combined_paired/HyraxID/"
+    GT_FOLDER = "C:/PHD/SideProjectsData/HeloiseNewDownload/YearLocationTest/7-13_David/GTLabels/"
+    PRED_FOLDER = "C:/PHD/SideProjectsData/HeloiseNewDownload/YearLocationTest/7-13_David/Hyrax-ID/"
 
     main(GT_FOLDER, PRED_FOLDER)
