@@ -187,11 +187,11 @@ class ArcFace(nn.Module):
 # -------------------------
 # Full Model
 # -------------------------
-class TDNNBoutModel(nn.Module):
+class ECAPATDNNBoutModel(nn.Module):
     def __init__(self,
                  num_classes,
                  input_dim=64,
-                 emb_dim=128):
+                 emb_dim=192):
         super().__init__()
 
         self.encoder = TDNNElementEncoder(
