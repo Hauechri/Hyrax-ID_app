@@ -118,10 +118,11 @@ class InferenceWorker(QObject):
                     }
                 )
 
+            # Highest-confidence bout is used to pick "the" answer, but the
+            # confidence number itself isn't shown -- it's not meaningful to
+            # someone reading the result and was confusing rather than useful.
             top = max(bouts, key=lambda b: b["confidence"])
-            self.log_line.emit(
-                f"RESULT: {stem}: identified as {top['animal']} ({top['confidence']:.1%}), {len(bouts)} bout(s) total"
-            )
+            self.log_line.emit(f"RESULT: {stem}: identified as {top['animal']}, {len(bouts)} bout(s) total")
             self.file_finished.emit(
                 stem,
                 {

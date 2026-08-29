@@ -6,8 +6,9 @@ minutes per file and only communicates via stdout, so the log is the primary
 "what's happening, and what did it find" surface.
 """
 import os
+import time
 
-from PySide6.QtCore import QThread, Qt
+from PySide6.QtCore import QThread, QTimer, Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
@@ -46,6 +47,13 @@ class MainWindow(QMainWindow):
         self._download_thread = None
         self._download_worker = None
         self._chain_to_inference_after_download = False
+
+        self._run_start_time = None
+        self._file_slice_start_time = None
+        self._latest_slice_progress = None
+        self._eta_timer = QTimer(self)
+        self._eta_timer.setInterval(1000)
+        self._eta_timer.timeout.connect(self._update_eta_display)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         self.setCentralWidget(splitter)
@@ -87,6 +95,19 @@ class MainWindow(QMainWindow):
         self.slice_progress_bar.setFormat("Slice %v/%m")
         self.slice_progress_bar.setVisible(False)
         layout.addWidget(self.slice_progress_bar)
+
+        self.timing_row = QWidget()
+        timing_layout = QHBoxLayout(self.timing_row)
+        timing_layout.setContentsMargins(0, 0, 0, 0)
+        self.elapsed_label = QLabel()
+        self.remaining_label = QLabel()
+        for lbl in (self.elapsed_label, self.remaining_label):
+            lbl.setStyleSheet("color: #9a9a9a; font-size: 9pt;")
+        timing_layout.addWidget(self.elapsed_label)
+        timing_layout.addStretch(1)
+        timing_layout.addWidget(self.remaining_label)
+        self.timing_row.setVisible(False)
+        layout.addWidget(self.timing_row)
 
         self.status_label = QLabel("Ready.")
         self.status_label.setWordWrap(True)
@@ -311,13 +332,20 @@ class MainWindow(QMainWindow):
 
         self.start_button.setEnabled(False)
         self.cancel_button.setEnabled(True)
-        self.status_label.setText("Processing... (this can take several minutes per file)")
+        self.status_label.setText("Processing...")
         self.log_console.clear()
         self.results_model.clear()
         self.headline_label.setText("")
         self._file_summaries = {}
         self.slice_progress_bar.setVisible(True)
         self.slice_progress_bar.setRange(0, 0)  # indeterminate until the first slice_progress arrives
+        self.timing_row.setVisible(True)
+
+        self._run_start_time = time.monotonic()
+        self._file_slice_start_time = None
+        self._latest_slice_progress = None
+        self._update_eta_display()
+        self._eta_timer.start()
 
         run_kwargs = dict(
             audio_path=input_path,
@@ -346,15 +374,43 @@ class MainWindow(QMainWindow):
     def _on_slice_progress(self, current, total):
         self.slice_progress_bar.setRange(0, total)
         self.slice_progress_bar.setValue(current)
+        if current == 1:
+            # A new file's detector pass just started -- time it from here
+            # rather than from the whole run's start, since denoising and
+            # model loading time isn't representative of the per-slice rate.
+            self._file_slice_start_time = time.monotonic()
+        self._latest_slice_progress = (current, total)
+
+    @staticmethod
+    def _format_seconds(seconds):
+        seconds = max(0, int(seconds))
+        return f"{seconds // 60}:{seconds % 60:02d}"
+
+    def _update_eta_display(self):
+        if self._run_start_time is None:
+            return
+        elapsed = time.monotonic() - self._run_start_time
+        self.elapsed_label.setText(f"Elapsed {self._format_seconds(elapsed)}")
+
+        remaining_text = "Estimating remaining time..."
+        if self._latest_slice_progress and self._file_slice_start_time is not None:
+            current, total = self._latest_slice_progress
+            if current > 0:
+                file_elapsed = time.monotonic() - self._file_slice_start_time
+                remaining = (file_elapsed / current) * (total - current)
+                remaining_text = f"~{self._format_seconds(remaining)} remaining"
+        self.remaining_label.setText(remaining_text)
 
     def _on_cancel(self):
         if self._worker is not None:
             self._worker.request_cancel()
             self.cancel_button.setEnabled(False)
+            self._eta_timer.stop()
             self.status_label.setText("Cancelling... (will stop after the current file)")
 
     def _on_error(self, traceback_text):
         self._append_log(f"[ERROR] {traceback_text}")
+        self._eta_timer.stop()
         self.status_label.setText("Failed.")
         QMessageBox.critical(self, "Pipeline error", traceback_text)
 
@@ -365,13 +421,15 @@ class MainWindow(QMainWindow):
             if s["top_animal"] is None:
                 parts.append(f"{name}: no animal identified")
             else:
-                parts.append(f"{name}: {s['top_animal']} ({s['top_confidence']:.0%})")
+                parts.append(f"{name}: {s['top_animal']}")
         self.headline_label.setText("  |  ".join(parts))
 
     def _on_finished(self):
         self.start_button.setEnabled(True)
         self.cancel_button.setEnabled(False)
         self.slice_progress_bar.setVisible(False)
+        self.timing_row.setVisible(False)
+        self._eta_timer.stop()
         if self.status_label.text() not in ("Failed.", "Cancelling... (will stop after the current file)"):
             self.status_label.setText("Done.")
         elif self.status_label.text() == "Cancelling... (will stop after the current file)":

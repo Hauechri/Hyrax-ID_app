@@ -1,7 +1,7 @@
 """Table model backing the results panel: one row per identified bout."""
 from PySide6.QtCore import QAbstractTableModel, Qt, QModelIndex
 
-COLUMNS = ["File", "Bout", "Animal", "Confidence", "Start (s)", "End (s)"]
+COLUMNS = ["File", "Bout", "Animal", "Start (s)", "End (s)"]
 
 
 class ResultsModel(QAbstractTableModel):
@@ -43,9 +43,7 @@ class ResultsModel(QAbstractTableModel):
         if col == 2:
             return r["animal"]
         if col == 3:
-            return f"{r['confidence']:.1%}"
-        if col == 4:
             return f"{r['start']:.2f}"
-        if col == 5:
+        if col == 4:
             return f"{r['end']:.2f}"
         return None
