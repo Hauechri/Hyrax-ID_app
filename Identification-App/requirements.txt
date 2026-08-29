@@ -1,0 +1,21 @@
+# CPU-only PyTorch build (default). For a CUDA machine, see requirements-cuda.txt.
+#--extra-index-url https://download.pytorch.org/whl/cpu
+#torch
+#torchaudio
+#torchvision
+
+PySide6
+ultralytics==8.4.96
+xgboost==3.3.0
+librosa==0.11.0
+soundfile
+resampy
+scipy
+opencv-python
+scikit-image
+scikit-learn
+joblib
+numpy
+matplotlib
+platformdirs
+requests

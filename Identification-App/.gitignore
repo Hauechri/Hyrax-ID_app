@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Nuitka build output
+build/
+*.build/
+*.dist/
+*.onefile-build/
+
+# Denoiser model — fetched at runtime, never committed (too large for git)
+*.pk
+*.pk.part
+
+# App runtime data
+*.log
+denoised_tmp/
+output/
+
+# Qt/user settings
+*.ini
+
+# Editors
+.idea/
+.vscode/

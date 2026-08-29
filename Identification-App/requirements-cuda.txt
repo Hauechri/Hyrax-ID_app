@@ -1,0 +1,9 @@
+# CUDA build. Swap to this if running on a machine with an NVIDIA GPU:
+#   .venv\Scripts\pip uninstall torch torchaudio torchvision -y
+#   .venv\Scripts\pip install -r requirements-cuda.txt
+# Check https://pytorch.org/get-started/locally/ for the correct index URL
+# for your installed CUDA toolkit version if cu121 below is no longer current.
+--extra-index-url https://download.pytorch.org/whl/cu121
+torch
+torchaudio
+torchvision
