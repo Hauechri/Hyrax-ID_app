@@ -1,17 +1,26 @@
 """
-Main window: a QSplitter with input/output/run controls on the left (mirroring
-Alireza_Spectrogram_Viewer's controls-panel layout) and, instead of a
-spectrogram canvas on the right, a live log console -- the pipeline runs for
-minutes per file and only communicates via stdout, so the log is the primary
-"what's happening, and what did it find" surface.
+Main window: a QSplitter with input/output/model/settings controls on the
+left (mirroring Alireza_Spectrogram_Viewer's controls-panel layout) and,
+instead of a spectrogram canvas on the right, a live log console -- the
+pipeline runs for minutes per file and only communicates via stdout, so the
+log is the primary "what's happening, and what did it find" surface.
+
+All four models (including the denoiser) are selected as file paths by the
+user -- there is no online download step. Advanced pipeline parameters
+(window/hop size, thresholds, etc.) are exposed as editable fields, and the
+whole left-hand configuration can be saved to / loaded from a .cfg file.
 """
+import configparser
 import os
 import time
 
 from PySide6.QtCore import QThread, QTimer, Qt
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
+    QDoubleSpinBox,
     QFileDialog,
+    QFormLayout,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
@@ -24,6 +33,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QRadioButton,
     QScrollArea,
+    QSpinBox,
     QSplitter,
     QTableView,
     QVBoxLayout,
@@ -31,22 +41,48 @@ from PySide6.QtWidgets import (
 )
 
 import paths
-from downloader import DownloadWorker, denoiser_cache_path, denoiser_is_cached
 from results_model import ResultsModel
 from worker import InferenceWorker
+
+# Advanced pipeline parameters exposed in the UI, matching
+# pipeline_runner.DEFAULT_PARAMS. "kind" drives which widget is built and
+# how the value round-trips to/from the .cfg file.
+#   int    -> QSpinBox
+#   float  -> QDoubleSpinBox
+#   bool   -> QCheckBox
+ADVANCED_PARAM_SPECS = [
+    ("window_size", "int", 48000, dict(minimum=1, maximum=10_000_000)),
+    ("hop_size", "int", 24000, dict(minimum=1, maximum=10_000_000)),
+    ("image_size", "int", 800, dict(minimum=1, maximum=100_000)),
+    ("isMulti", "bool", True, {}),
+    ("interarrival_threshold", "float", 0.724, dict(minimum=0.0, maximum=1000.0, decimals=3, singleStep=0.01)),
+    ("detector_threshold", "float", 0.330, dict(minimum=0.0, maximum=1.0, decimals=3, singleStep=0.01)),
+    ("context_windowsize", "int", 5, dict(minimum=0, maximum=100_000)),
+    ("GB_threshold", "float", 0.3, dict(minimum=0.0, maximum=1.0, decimals=3, singleStep=0.01)),
+    ("GB_scoreweight", "float", 0.3, dict(minimum=0.0, maximum=1.0, decimals=3, singleStep=0.01)),
+    ("Denoiser_sequence_length", "int", 1, dict(minimum=1, maximum=100_000)),
+    ("Denoiser_num_worker", "int", 0, dict(minimum=0, maximum=64)),
+]
+
+# Model path fields: (attribute prefix, label, default from paths.py)
+MODEL_PATH_FIELDS = [
+    ("detector", "Detector model", paths.DETECTOR_MODEL_PATH),
+    ("garbage_filter", "Garbage filter model", paths.GARBAGE_FILTER_MODEL_PATH),
+    ("animal_classifier", "Animal classifier model", paths.ANIMAL_CLASSIFIER_MODEL_PATH),
+    ("denoiser", "Denoiser model", paths.DENOISER_ACA_MODEL_PATH),
+]
+
+CFG_SECTION = "hyraxid"
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Hyrax-ID")
-        self.resize(1100, 640)
+        self.resize(1150, 660)
 
         self._thread = None
         self._worker = None
-        self._download_thread = None
-        self._download_worker = None
-        self._chain_to_inference_after_download = False
 
         self._run_start_time = None
         self._file_slice_start_time = None
@@ -55,6 +91,9 @@ class MainWindow(QMainWindow):
         self._eta_timer.setInterval(1000)
         self._eta_timer.timeout.connect(self._update_eta_display)
 
+        self._advanced_widgets = {}  # name -> widget
+        self._model_path_edits = {}  # prefix -> QLineEdit
+
         splitter = QSplitter(Qt.Orientation.Horizontal)
         self.setCentralWidget(splitter)
 
@@ -62,24 +101,26 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self._build_log_panel())
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
-        splitter.setSizes([360, 740])
+        splitter.setSizes([380, 770])
 
     # -- left: controls panel --------------------------------------------
 
     def _build_controls_panel(self):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setMinimumWidth(320)
-        scroll.setMaximumWidth(460)
+        scroll.setMinimumWidth(340)
+        scroll.setMaximumWidth(480)
 
         inner = QWidget()
         scroll.setWidget(inner)
         layout = QVBoxLayout(inner)
 
+        layout.addLayout(self._build_config_row())
         layout.addWidget(self._build_input_group())
         layout.addWidget(self._build_output_group())
-        layout.addWidget(self._build_denoiser_group())
+        layout.addWidget(self._build_models_group())
         layout.addWidget(self._build_device_group())
+        layout.addWidget(self._build_advanced_group())
 
         button_row = QHBoxLayout()
         self.start_button = QPushButton("Start")
@@ -115,6 +156,106 @@ class MainWindow(QMainWindow):
         layout.addStretch(1)
 
         return scroll
+
+    # -- config save/load --------------------------------------------------
+
+    def _build_config_row(self):
+        row = QHBoxLayout()
+        load_button = QPushButton("Load settings...")
+        load_button.clicked.connect(self._load_config)
+        save_button = QPushButton("Save settings...")
+        save_button.clicked.connect(self._save_config)
+        row.addWidget(load_button)
+        row.addWidget(save_button)
+        return row
+
+    def _save_config(self):
+        path, _ = QFileDialog.getSaveFileName(self, "Save settings", "", "Config files (*.cfg)")
+        if not path:
+            return
+        if not path.lower().endswith(".cfg"):
+            path += ".cfg"
+
+        cfg = configparser.ConfigParser()
+        cfg[CFG_SECTION] = {}
+        section = cfg[CFG_SECTION]
+
+        section["input_mode"] = "single_file" if self.single_file_radio.isChecked() else "folder"
+        section["input_path"] = self.input_path_edit.text()
+        section["output_path"] = self.output_path_edit.text()
+        section["device"] = self.device_combo.currentData()
+
+        for prefix, _label, _default in MODEL_PATH_FIELDS:
+            section[f"{prefix}_model_path"] = self._model_path_edits[prefix].text()
+
+        for name, kind, _default, _kwargs in ADVANCED_PARAM_SPECS:
+            widget = self._advanced_widgets[name]
+            if kind == "bool":
+                section[name] = str(widget.isChecked())
+            else:
+                section[name] = str(widget.value())
+
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                cfg.write(f)
+        except OSError as exc:
+            QMessageBox.critical(self, "Save failed", f"Could not save settings:\n{exc}")
+            return
+        self.status_label.setText(f"Settings saved to {path}")
+
+    def _load_config(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Load settings", "", "Config files (*.cfg)")
+        if not path:
+            return
+
+        cfg = configparser.ConfigParser()
+        try:
+            with open(path, encoding="utf-8") as f:
+                cfg.read_file(f)
+        except (OSError, configparser.Error) as exc:
+            QMessageBox.critical(self, "Load failed", f"Could not load settings:\n{exc}")
+            return
+
+        if CFG_SECTION not in cfg:
+            QMessageBox.critical(self, "Load failed", f"'{path}' is not a Hyrax-ID settings file.")
+            return
+        section = cfg[CFG_SECTION]
+
+        if section.get("input_mode") == "folder":
+            self.folder_radio.setChecked(True)
+        elif section.get("input_mode") == "single_file":
+            self.single_file_radio.setChecked(True)
+        self.input_path_edit.setText(section.get("input_path", self.input_path_edit.text()))
+        self.output_path_edit.setText(section.get("output_path", self.output_path_edit.text()))
+
+        device = section.get("device")
+        if device is not None:
+            idx = self.device_combo.findData(device)
+            if idx != -1:
+                self.device_combo.setCurrentIndex(idx)
+
+        for prefix, _label, _default in MODEL_PATH_FIELDS:
+            value = section.get(f"{prefix}_model_path")
+            if value is not None:
+                self._model_path_edits[prefix].setText(value)
+
+        for name, kind, _default, _kwargs in ADVANCED_PARAM_SPECS:
+            if name not in section:
+                continue
+            widget = self._advanced_widgets[name]
+            try:
+                if kind == "bool":
+                    widget.setChecked(section.getboolean(name))
+                elif kind == "int":
+                    widget.setValue(section.getint(name))
+                else:
+                    widget.setValue(section.getfloat(name))
+            except ValueError:
+                continue  # leave that one field at its current value
+
+        self.status_label.setText(f"Settings loaded from {path}")
+
+    # -- input / output ------------------------------------------------
 
     def _build_input_group(self):
         group = QGroupBox("Input")
@@ -164,84 +305,33 @@ class MainWindow(QMainWindow):
         if path:
             self.output_path_edit.setText(path)
 
-    def _build_denoiser_group(self):
-        group = QGroupBox("Denoiser model")
+    # -- models (all four are user-selected paths, incl. the denoiser) -----
+
+    def _build_models_group(self):
+        group = QGroupBox("Models")
         layout = QVBoxLayout(group)
 
-        self.denoiser_status_label = QLabel()
-        self.denoiser_status_label.setWordWrap(True)
-        layout.addWidget(self.denoiser_status_label)
+        for prefix, label, default in MODEL_PATH_FIELDS:
+            row_label = QLabel(label)
+            layout.addWidget(row_label)
 
-        self.denoiser_progress = QProgressBar()
-        self.denoiser_progress.setVisible(False)
-        layout.addWidget(self.denoiser_progress)
+            row = QHBoxLayout()
+            edit = QLineEdit()
+            edit.setText(default)
+            browse_button = QPushButton("Browse...")
+            browse_button.clicked.connect(lambda _checked=False, e=edit: self._browse_model_path(e))
+            row.addWidget(edit)
+            row.addWidget(browse_button)
+            layout.addLayout(row)
 
-        self.denoiser_download_button = QPushButton()
-        self.denoiser_download_button.clicked.connect(lambda: self._start_download(chain_to_inference=False))
-        layout.addWidget(self.denoiser_download_button)
+            self._model_path_edits[prefix] = edit
 
-        self._refresh_denoiser_status()
         return group
 
-    def _refresh_denoiser_status(self):
-        if denoiser_is_cached():
-            self.denoiser_status_label.setText(f"Ready ({denoiser_cache_path()})")
-            self.denoiser_download_button.setText("Re-download")
-        else:
-            self.denoiser_status_label.setText("Not downloaded yet -- fetched automatically the first time you press Start, or you can fetch it now.")
-            self.denoiser_download_button.setText("Download now")
-
-    def _start_download(self, chain_to_inference):
-        if self._download_thread is not None:
-            return  # already downloading
-
-        self._chain_to_inference_after_download = chain_to_inference
-        self.denoiser_download_button.setEnabled(False)
-        self.start_button.setEnabled(False)
-        self.denoiser_progress.setVisible(True)
-        self.denoiser_progress.setRange(0, 0)  # indeterminate until we know the total
-        self.denoiser_status_label.setText("Downloading denoiser model...")
-
-        self._download_thread = QThread(self)
-        self._download_worker = DownloadWorker()
-        self._download_worker.moveToThread(self._download_thread)
-
-        self._download_thread.started.connect(self._download_worker.run)
-        self._download_worker.progress.connect(self._on_download_progress)
-        self._download_worker.error.connect(self._on_download_error)
-        self._download_worker.finished.connect(self._on_download_finished)
-
-        self._download_thread.start()
-
-    def _on_download_progress(self, read, total):
-        if total > 0:
-            self.denoiser_progress.setRange(0, total)
-            self.denoiser_progress.setValue(read)
-            self.denoiser_status_label.setText(f"Downloading denoiser model... {read / 1e6:.1f} / {total / 1e6:.1f} MB")
-        else:
-            self.denoiser_status_label.setText(f"Downloading denoiser model... {read / 1e6:.1f} MB")
-
-    def _on_download_error(self, message):
-        QMessageBox.critical(self, "Download failed", f"Could not download the denoiser model:\n{message}")
-        self._chain_to_inference_after_download = False
-
-    def _on_download_finished(self):
-        if self._download_thread is not None:
-            self._download_thread.quit()
-            self._download_thread.wait()
-        self._download_thread = None
-        self._download_worker = None
-
-        self.denoiser_progress.setVisible(False)
-        self.denoiser_download_button.setEnabled(True)
-        self.start_button.setEnabled(True)
-        self._refresh_denoiser_status()
-
-        if self._chain_to_inference_after_download and denoiser_is_cached():
-            self._chain_to_inference_after_download = False
-            self._start_inference()
-        else:
-            self._chain_to_inference_after_download = False
+    def _browse_model_path(self, line_edit):
+        path, _ = QFileDialog.getOpenFileName(self, "Select model file")
+        if path:
+            line_edit.setText(path)
 
     def _build_device_group(self):
         group = QGroupBox("Device")
@@ -261,6 +351,46 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.device_combo)
 
         return group
+
+    # -- advanced pipeline settings -----------------------------------------
+
+    def _build_advanced_group(self):
+        group = QGroupBox("Advanced settings")
+        form = QFormLayout(group)
+
+        for name, kind, default, kwargs in ADVANCED_PARAM_SPECS:
+            if kind == "bool":
+                widget = QCheckBox()
+                widget.setChecked(default)
+            elif kind == "int":
+                widget = QSpinBox()
+                widget.setMinimum(kwargs.get("minimum", 0))
+                widget.setMaximum(kwargs.get("maximum", 1_000_000))
+                widget.setValue(default)
+            else:  # float
+                widget = QDoubleSpinBox()
+                widget.setDecimals(kwargs.get("decimals", 3))
+                widget.setMinimum(kwargs.get("minimum", 0.0))
+                widget.setMaximum(kwargs.get("maximum", 1.0))
+                widget.setSingleStep(kwargs.get("singleStep", 0.01))
+                widget.setValue(default)
+
+            form.addRow(name, widget)
+            self._advanced_widgets[name] = widget
+
+        return group
+
+    def _collect_param_overrides(self):
+        overrides = {}
+        for name, kind, _default, _kwargs in ADVANCED_PARAM_SPECS:
+            widget = self._advanced_widgets[name]
+            if kind == "bool":
+                overrides[name] = widget.isChecked()
+            elif kind == "int":
+                overrides[name] = widget.value()
+            else:
+                overrides[name] = widget.value()
+        return overrides
 
     # -- right: log panel --------------------------------------------------
 
@@ -319,8 +449,18 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Missing input", "Please select an input and an output folder.")
             return
 
-        if not denoiser_is_cached():
-            self._start_download(chain_to_inference=True)
+        missing = [
+            label
+            for prefix, label, _default in MODEL_PATH_FIELDS
+            if not self._model_path_edits[prefix].text().strip()
+            or not os.path.isfile(self._model_path_edits[prefix].text().strip())
+        ]
+        if missing:
+            QMessageBox.warning(
+                self,
+                "Missing model file(s)",
+                "Please point every model field at a valid file:\n" + "\n".join(missing),
+            )
             return
 
         self._start_inference()
@@ -350,11 +490,12 @@ class MainWindow(QMainWindow):
         run_kwargs = dict(
             audio_path=input_path,
             output_path=output_path,
-            detector_model_path=paths.DETECTOR_MODEL_PATH,
-            garbage_filter_model_path=paths.GARBAGE_FILTER_MODEL_PATH,
-            animal_classifier_model_path=paths.ANIMAL_CLASSIFIER_MODEL_PATH,
-            denoiser_model_path=denoiser_cache_path(),
+            detector_model_path=self._model_path_edits["detector"].text().strip(),
+            garbage_filter_model_path=self._model_path_edits["garbage_filter"].text().strip(),
+            animal_classifier_model_path=self._model_path_edits["animal_classifier"].text().strip(),
+            denoiser_model_path=self._model_path_edits["denoiser"].text().strip(),
             device_override=self.device_combo.currentData(),
+            **self._collect_param_overrides(),
         )
 
         self._thread = QThread(self)
