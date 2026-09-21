@@ -1,0 +1,559 @@
+C:\PHD\SideProjects\.venv\Scripts\python.exe C:\PHD\SideProjects\ICASSP_HYRAX\ECAPA-TDNN\TRAIN\train_ECAPATDNN.py 
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 1/150
+Train Loss: 2.5971 | Acc: 0.3458
+Val   Loss: 2.5775 | Acc: 0.2902
+Learning Rate: 5.00e-05
+New best model saved
+
+Epoch 2/150
+Train Loss: 2.3336 | Acc: 0.6289
+Val   Loss: 2.3841 | Acc: 0.5383
+Learning Rate: 5.00e-05
+New best model saved
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 3/150
+Train Loss: 2.2008 | Acc: 0.7538
+Val   Loss: 2.3471 | Acc: 0.5277
+Learning Rate: 5.00e-05
+Patience: 1/15
+
+Epoch 4/150
+Train Loss: 2.1500 | Acc: 0.7974
+Val   Loss: 2.2496 | Acc: 0.6781
+Learning Rate: 5.00e-05
+New best model saved
+
+Epoch 5/150
+Train Loss: 2.1085 | Acc: 0.8270
+Val   Loss: 2.1930 | Acc: 0.7084
+Learning Rate: 5.00e-05
+New best model saved
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 6/150
+Train Loss: 2.0943 | Acc: 0.8318
+Val   Loss: 2.1730 | Acc: 0.7150
+Learning Rate: 5.00e-05
+New best model saved
+
+Epoch 7/150
+Train Loss: 2.0660 | Acc: 0.8641
+Val   Loss: 2.1979 | Acc: 0.6953
+Learning Rate: 5.00e-05
+Patience: 1/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 8/150
+Train Loss: 2.0605 | Acc: 0.8614
+Val   Loss: 2.1544 | Acc: 0.7639
+Learning Rate: 5.00e-05
+New best model saved
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 9/150
+Train Loss: 2.0432 | Acc: 0.8862
+Val   Loss: 2.1766 | Acc: 0.7230
+Learning Rate: 5.00e-05
+Patience: 1/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 10/150
+Train Loss: 2.0310 | Acc: 0.8940
+Val   Loss: 2.1359 | Acc: 0.7599
+Learning Rate: 5.00e-05
+Patience: 2/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 11/150
+Train Loss: 2.0215 | Acc: 0.9050
+Val   Loss: 2.1415 | Acc: 0.7546
+Learning Rate: 5.00e-05
+Patience: 3/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 12/150
+Train Loss: 2.0189 | Acc: 0.9018
+Val   Loss: 2.1232 | Acc: 0.7691
+Learning Rate: 5.00e-05
+New best model saved
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 13/150
+Train Loss: 2.0126 | Acc: 0.9115
+Val   Loss: 2.1257 | Acc: 0.7375
+Learning Rate: 5.00e-05
+Patience: 1/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 14/150
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]Train Loss: 2.0038 | Acc: 0.9212
+Val   Loss: 2.1381 | Acc: 0.7691
+Learning Rate: 5.00e-05
+Patience: 2/15
+
+Epoch 15/150
+Train Loss: 2.0076 | Acc: 0.9177
+Val   Loss: 2.0980 | Acc: 0.8087
+Learning Rate: 5.00e-05
+New best model saved
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 16/150
+Train Loss: 1.9969 | Acc: 0.9306
+Val   Loss: 2.1252 | Acc: 0.7955
+Learning Rate: 5.00e-05
+Patience: 1/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 17/150
+Train Loss: 1.9982 | Acc: 0.9206
+Val   Loss: 2.0947 | Acc: 0.8021
+Learning Rate: 5.00e-05
+Patience: 2/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 18/150
+Train Loss: 1.9981 | Acc: 0.9281
+Val   Loss: 2.0990 | Acc: 0.8232
+Learning Rate: 5.00e-05
+New best model saved
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 19/150
+Train Loss: 1.9882 | Acc: 0.9435
+Val   Loss: 2.0972 | Acc: 0.8100
+Learning Rate: 5.00e-05
+Patience: 1/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 20/150
+Train Loss: 1.9867 | Acc: 0.9403
+Val   Loss: 2.1112 | Acc: 0.7757
+Learning Rate: 5.00e-05
+Patience: 2/15
+
+Epoch 21/150
+Train Loss: 1.9849 | Acc: 0.9443
+Val   Loss: 2.0926 | Acc: 0.8219
+Learning Rate: 5.00e-05
+Patience: 3/15
+
+Epoch 22/150
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]Train Loss: 1.9865 | Acc: 0.9357
+Val   Loss: 2.0987 | Acc: 0.8087
+Learning Rate: 5.00e-05
+Patience: 4/15
+
+Epoch 23/150
+Train Loss: 1.9816 | Acc: 0.9427
+Val   Loss: 2.1091 | Acc: 0.7968
+Learning Rate: 5.00e-05
+Patience: 5/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 24/150
+Train Loss: 1.9808 | Acc: 0.9459
+Val   Loss: 2.1075 | Acc: 0.8100
+Learning Rate: 5.00e-05
+Patience: 6/15
+
+Epoch 25/150
+Train Loss: 1.9770 | Acc: 0.9508
+Val   Loss: 2.0756 | Acc: 0.8404
+Learning Rate: 5.00e-05
+New best model saved
+
+Epoch 26/150
+Train Loss: 1.9768 | Acc: 0.9499
+Val   Loss: 2.0963 | Acc: 0.8232
+Learning Rate: 5.00e-05
+Patience: 1/15
+
+Epoch 27/150
+Train Loss: 1.9774 | Acc: 0.9451
+Val   Loss: 2.0817 | Acc: 0.8325
+Learning Rate: 5.00e-05
+Patience: 2/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 28/150
+Train Loss: 1.9714 | Acc: 0.9591
+Val   Loss: 2.0859 | Acc: 0.8285
+Learning Rate: 5.00e-05
+Patience: 3/15
+
+Epoch 29/150
+Train Loss: 1.9721 | Acc: 0.9596
+Val   Loss: 2.0897 | Acc: 0.8113
+Learning Rate: 5.00e-05
+Patience: 4/15
+
+Epoch 30/150
+Train Loss: 1.9697 | Acc: 0.9607
+Val   Loss: 2.0702 | Acc: 0.8391
+Learning Rate: 5.00e-05
+Patience: 5/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 31/150
+Train Loss: 1.9730 | Acc: 0.9508
+Val   Loss: 2.0879 | Acc: 0.8351
+Learning Rate: 5.00e-05
+Patience: 6/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 32/150
+Train Loss: 1.9719 | Acc: 0.9526
+Val   Loss: 2.0848 | Acc: 0.8219
+Learning Rate: 5.00e-05
+Patience: 7/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 33/150
+Train Loss: 1.9682 | Acc: 0.9575
+Val   Loss: 2.1032 | Acc: 0.8061
+Learning Rate: 5.00e-05
+Patience: 8/15
+
+Epoch 34/150
+Train Loss: 1.9683 | Acc: 0.9612
+Val   Loss: 2.0911 | Acc: 0.8179
+Learning Rate: 5.00e-05
+Patience: 9/15
+
+Epoch 35/150
+Train Loss: 1.9659 | Acc: 0.9615
+Val   Loss: 2.0747 | Acc: 0.8391
+Learning Rate: 5.00e-05
+Patience: 10/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 36/150
+Train Loss: 1.9649 | Acc: 0.9664
+Val   Loss: 2.0926 | Acc: 0.8193
+Learning Rate: 2.50e-05
+Patience: 11/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 37/150
+Train Loss: 1.9563 | Acc: 0.9712
+Val   Loss: 2.0603 | Acc: 0.8536
+Learning Rate: 2.50e-05
+New best model saved
+
+Epoch 38/150
+Train Loss: 1.9503 | Acc: 0.9836
+Val   Loss: 2.0650 | Acc: 0.8417
+Learning Rate: 2.50e-05
+Patience: 1/15
+
+Epoch 39/150
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]Train Loss: 1.9518 | Acc: 0.9774
+Val   Loss: 2.0729 | Acc: 0.8377
+Learning Rate: 2.50e-05
+Patience: 2/15
+
+Epoch 40/150
+Train Loss: 1.9516 | Acc: 0.9785
+Val   Loss: 2.0843 | Acc: 0.8193
+Learning Rate: 2.50e-05
+Patience: 3/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 41/150
+Train Loss: 1.9505 | Acc: 0.9782
+Val   Loss: 2.0590 | Acc: 0.8483
+Learning Rate: 2.50e-05
+Patience: 4/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 42/150
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]Train Loss: 1.9485 | Acc: 0.9812
+Val   Loss: 2.0683 | Acc: 0.8496
+Learning Rate: 2.50e-05
+Patience: 5/15
+
+Epoch 43/150
+Train Loss: 1.9496 | Acc: 0.9785
+Val   Loss: 2.0536 | Acc: 0.8588
+Learning Rate: 2.50e-05
+New best model saved
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 44/150
+Train Loss: 1.9464 | Acc: 0.9852
+Val   Loss: 2.0503 | Acc: 0.8681
+Learning Rate: 2.50e-05
+New best model saved
+
+Epoch 45/150
+Train Loss: 1.9484 | Acc: 0.9806
+Val   Loss: 2.0605 | Acc: 0.8549
+Learning Rate: 2.50e-05
+Patience: 1/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 46/150
+Train Loss: 1.9476 | Acc: 0.9828
+Val   Loss: 2.0599 | Acc: 0.8628
+Learning Rate: 2.50e-05
+Patience: 2/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 47/150
+Train Loss: 1.9471 | Acc: 0.9825
+Val   Loss: 2.0672 | Acc: 0.8522
+Learning Rate: 2.50e-05
+Patience: 3/15
+
+Epoch 48/150
+Train Loss: 1.9471 | Acc: 0.9841
+Val   Loss: 2.0701 | Acc: 0.8456
+Learning Rate: 2.50e-05
+Patience: 4/15
+
+Epoch 49/150
+Train Loss: 1.9468 | Acc: 0.9820
+Val   Loss: 2.0637 | Acc: 0.8588
+Learning Rate: 2.50e-05
+Patience: 5/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 50/150
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]Train Loss: 1.9469 | Acc: 0.9804
+Val   Loss: 2.0544 | Acc: 0.8654
+Learning Rate: 1.25e-05
+Patience: 6/15
+
+Epoch 51/150
+Train Loss: 1.9421 | Acc: 0.9887
+Val   Loss: 2.0552 | Acc: 0.8588
+Learning Rate: 1.25e-05
+Patience: 7/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 52/150
+Train Loss: 1.9418 | Acc: 0.9882
+Val   Loss: 2.0477 | Acc: 0.8720
+Learning Rate: 1.25e-05
+New best model saved
+
+Epoch 53/150
+Train Loss: 1.9423 | Acc: 0.9879
+Val   Loss: 2.0502 | Acc: 0.8668
+Learning Rate: 1.25e-05
+Patience: 1/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 54/150
+Train Loss: 1.9417 | Acc: 0.9871
+Val   Loss: 2.0481 | Acc: 0.8628
+Learning Rate: 1.25e-05
+Patience: 2/15
+
+Epoch 55/150
+Train Loss: 1.9418 | Acc: 0.9884
+Val   Loss: 2.0515 | Acc: 0.8615
+Learning Rate: 1.25e-05
+Patience: 3/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 56/150
+Train Loss: 1.9417 | Acc: 0.9865
+Val   Loss: 2.0561 | Acc: 0.8615
+Learning Rate: 1.25e-05
+Patience: 4/15
+
+Epoch 57/150
+Train Loss: 1.9424 | Acc: 0.9841
+Val   Loss: 2.0569 | Acc: 0.8575
+Learning Rate: 1.25e-05
+Patience: 5/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 58/150
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]Train Loss: 1.9410 | Acc: 0.9882
+Val   Loss: 2.0535 | Acc: 0.8588
+Learning Rate: 6.25e-06
+Patience: 6/15
+
+Epoch 59/150
+Train Loss: 1.9403 | Acc: 0.9879
+Val   Loss: 2.0532 | Acc: 0.8615
+Learning Rate: 6.25e-06
+Patience: 7/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 60/150
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]Train Loss: 1.9398 | Acc: 0.9890
+Val   Loss: 2.0476 | Acc: 0.8681
+Learning Rate: 6.25e-06
+Patience: 8/15
+
+Epoch 61/150
+Train Loss: 1.9397 | Acc: 0.9903
+Val   Loss: 2.0521 | Acc: 0.8628
+Learning Rate: 6.25e-06
+Patience: 9/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 62/150
+Train Loss: 1.9392 | Acc: 0.9911
+Val   Loss: 2.0513 | Acc: 0.8668
+Learning Rate: 6.25e-06
+Patience: 10/15
+
+Epoch 63/150
+Train Loss: 1.9389 | Acc: 0.9911
+Val   Loss: 2.0533 | Acc: 0.8654
+Learning Rate: 6.25e-06
+Patience: 11/15
+
+Epoch 64/150
+Train Loss: 1.9389 | Acc: 0.9890
+Val   Loss: 2.0481 | Acc: 0.8734
+Learning Rate: 3.13e-06
+New best model saved
+
+Epoch 65/150
+Train Loss: 1.9388 | Acc: 0.9900
+Val   Loss: 2.0520 | Acc: 0.8588
+Learning Rate: 3.13e-06
+Patience: 1/15
+
+Epoch 66/150
+Train Loss: 1.9392 | Acc: 0.9898
+Val   Loss: 2.0513 | Acc: 0.8720
+Learning Rate: 3.13e-06
+Patience: 2/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 67/150
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]Train Loss: 1.9398 | Acc: 0.9874
+Val   Loss: 2.0492 | Acc: 0.8681
+Learning Rate: 3.13e-06
+Patience: 3/15
+
+Epoch 68/150
+Train Loss: 1.9385 | Acc: 0.9900
+Val   Loss: 2.0513 | Acc: 0.8681
+Learning Rate: 3.13e-06
+Patience: 4/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 69/150
+Train Loss: 1.9389 | Acc: 0.9903
+Val   Loss: 2.0483 | Acc: 0.8760
+Learning Rate: 3.13e-06
+New best model saved
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 70/150
+Train Loss: 1.9382 | Acc: 0.9914
+Val   Loss: 2.0506 | Acc: 0.8707
+Learning Rate: 1.56e-06
+Patience: 1/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 71/150
+Train Loss: 1.9391 | Acc: 0.9892
+Val   Loss: 2.0485 | Acc: 0.8707
+Learning Rate: 1.56e-06
+Patience: 2/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 72/150
+Train Loss: 1.9387 | Acc: 0.9906
+Val   Loss: 2.0501 | Acc: 0.8641
+Learning Rate: 1.56e-06
+Patience: 3/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 73/150
+Train Loss: 1.9382 | Acc: 0.9909
+Val   Loss: 2.0499 | Acc: 0.8707
+Learning Rate: 1.56e-06
+Patience: 4/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 74/150
+Train Loss: 1.9378 | Acc: 0.9925
+Val   Loss: 2.0503 | Acc: 0.8707
+Learning Rate: 1.56e-06
+Patience: 5/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 75/150
+Train Loss: 1.9383 | Acc: 0.9914
+Val   Loss: 2.0478 | Acc: 0.8694
+Learning Rate: 1.56e-06
+Patience: 6/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 76/150
+Train Loss: 1.9383 | Acc: 0.9914
+Val   Loss: 2.0487 | Acc: 0.8760
+Learning Rate: 1.00e-06
+Patience: 7/15
+
+Epoch 77/150
+Train Loss: 1.9382 | Acc: 0.9911
+Val   Loss: 2.0495 | Acc: 0.8720
+Learning Rate: 1.00e-06
+Patience: 8/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 78/150
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]Train Loss: 1.9379 | Acc: 0.9917
+Val   Loss: 2.0495 | Acc: 0.8707
+Learning Rate: 1.00e-06
+Patience: 9/15
+
+Epoch 79/150
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]Train Loss: 1.9369 | Acc: 0.9946
+Val   Loss: 2.0490 | Acc: 0.8694
+Learning Rate: 1.00e-06
+Patience: 10/15
+
+Epoch 80/150
+Train Loss: 1.9375 | Acc: 0.9922
+Val   Loss: 2.0484 | Acc: 0.8668
+Learning Rate: 1.00e-06
+Patience: 11/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 81/150
+Train Loss: 1.9384 | Acc: 0.9911
+Val   Loss: 2.0483 | Acc: 0.8681
+Learning Rate: 1.00e-06
+Patience: 12/15
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]
+Epoch 82/150
+Train:   0%|          | 0/3716 [00:00<?, ?it/s]Train Loss: 1.9388 | Acc: 0.9898
+Val   Loss: 2.0483 | Acc: 0.8707
+Learning Rate: 1.00e-06
+Patience: 13/15
+
+Epoch 83/150
+Train Loss: 1.9371 | Acc: 0.9938
+Val   Loss: 2.0491 | Acc: 0.8720
+Learning Rate: 1.00e-06
+Patience: 14/15
+
+Epoch 84/150
+Train Loss: 1.9374 | Acc: 0.9919
+Val   Loss: 2.0494 | Acc: 0.8654
+Learning Rate: 1.00e-06
+Patience: 15/15
+Early stopping triggered
+                                                       
+===== FINAL TEST =====
+Test Loss: 2.0724
+Test Acc : 0.8424
+
+===== CLASSIFICATION REPORT =====
+              precision    recall  f1-score   support
+
+          J9     0.8333    0.7143    0.7692         7
+     Kashtan     0.8552    0.8921    0.8732       139
+          M0     0.5882    0.8333    0.6897        12
+          M9     0.7586    0.9565    0.8462        23
+          O1     0.9091    0.9091    0.9091        11
+          O7     0.9737    0.9250    0.9487        40
+          P0     0.9474    0.8182    0.8780        22
+          P1     0.6842    0.7358    0.7091        53
+          P8     0.8030    0.8281    0.8154        64
+          Q7     0.9107    0.9027    0.9067       113
+          R3     0.8989    0.8535    0.8756       198
+          T0     0.8704    0.7705    0.8174        61
+          T1     1.0000    0.5000    0.6667         4
+          T9     0.7500    0.8000    0.7742        15
+          U7     0.7091    0.7358    0.7222        53
+          U9     1.0000    1.0000    1.0000         5
+          W4     0.6667    0.7000    0.6829        20
+          X0     1.0000    0.7500    0.8571         4
+
+    accuracy                         0.8424       844
+   macro avg     0.8421    0.8125    0.8190       844
+weighted avg     0.8481    0.8424    0.8434       844
+
+
+===== CONFUSION MATRIX =====
+[[  5   0   0   0   0   0   0   0   0   0   1   0   0   0   1   0   0   0]
+ [  0 124   0   0   0   0   0   3   1   1   4   2   0   0   3   0   1   0]
+ [  0   0  10   0   0   0   0   0   1   1   0   0   0   0   0   0   0   0]
+ [  0   0   0  22   0   0   0   0   0   0   0   0   0   0   1   0   0   0]
+ [  0   0   0   1  10   0   0   0   0   0   0   0   0   0   0   0   0   0]
+ [  0   0   0   1   0  37   0   2   0   0   0   0   0   0   0   0   0   0]
+ [  0   2   0   1   0   0  18   0   0   0   1   0   0   0   0   0   0   0]
+ [  0   0   2   0   0   0   0  39   1   0   2   1   0   0   8   0   0   0]
+ [  0   2   1   0   0   0   0   0  53   1   0   2   0   0   0   0   5   0]
+ [  0   1   0   1   0   0   0   1   0 102   6   0   0   1   0   0   1   0]
+ [  1   7   1   1   1   0   0   3   3   7 169   2   0   2   1   0   0   0]
+ [  0   6   0   0   0   0   0   1   3   0   2  47   0   1   1   0   0   0]
+ [  0   0   0   0   0   1   0   0   0   0   1   0   2   0   0   0   0   0]
+ [  0   1   0   0   0   0   1   0   0   0   0   0   0  12   1   0   0   0]
+ [  0   1   1   1   0   0   0   8   2   0   1   0   0   0  39   0   0   0]
+ [  0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   5   0   0]
+ [  0   1   2   1   0   0   0   0   2   0   0   0   0   0   0   0  14   0]
+ [  0   0   0   0   0   0   0   0   0   0   1   0   0   0   0   0   0   3]]
+
+Process finished with exit code 0

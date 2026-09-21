@@ -1,0 +1,333 @@
+C:\PHD\Hyrax-ID_app\.venv\Scripts\python.exe C:\PHD\Hyrax-ID_app\HYRAX-ID_Inference\Tdnn\TRAIN\train_tdnn.py 
+
+Epoch 1/150
+Train Loss: 2.4702 | Acc: 0.4524
+Val   Loss: 2.3420 | Acc: 0.7168
+New best model saved
+
+Epoch 2/150
+Train Loss: 2.2578 | Acc: 0.7410
+Val   Loss: 2.2097 | Acc: 0.7832
+New best model saved
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 3/150
+Train Loss: 2.1492 | Acc: 0.8160
+Val   Loss: 2.1569 | Acc: 0.7587
+New best model saved
+
+Epoch 4/150
+Train Loss: 2.0863 | Acc: 0.8391
+Val   Loss: 2.1177 | Acc: 0.7902
+New best model saved
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 5/150
+Train Loss: 2.0427 | Acc: 0.8730
+Val   Loss: 2.0475 | Acc: 0.8462
+New best model saved
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 6/150
+Train Loss: 2.0095 | Acc: 0.8810
+Val   Loss: 2.0315 | Acc: 0.8287
+New best model saved
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 7/150
+Train Loss: 1.9718 | Acc: 0.9141
+Val   Loss: 2.0083 | Acc: 0.8392
+New best model saved
+
+Epoch 8/150
+Train Loss: 1.9605 | Acc: 0.9076
+Val   Loss: 1.9794 | Acc: 0.8497
+New best model saved
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 9/150
+Train Loss: 1.9243 | Acc: 0.9235
+Val   Loss: 1.9527 | Acc: 0.8671
+New best model saved
+
+Epoch 10/150
+Train Loss: 1.9048 | Acc: 0.9300
+Val   Loss: 1.9357 | Acc: 0.8601
+New best model saved
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 11/150
+Train Loss: 1.8887 | Acc: 0.9387
+Val   Loss: 1.9168 | Acc: 0.8601
+New best model saved
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 12/150
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]Train Loss: 1.8711 | Acc: 0.9372
+Val   Loss: 1.9033 | Acc: 0.8811
+New best model saved
+
+Epoch 13/150
+Train Loss: 1.8577 | Acc: 0.9437
+Val   Loss: 1.8872 | Acc: 0.8706
+New best model saved
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 14/150
+Train Loss: 1.8449 | Acc: 0.9430
+Val   Loss: 1.8816 | Acc: 0.8706
+New best model saved
+
+Epoch 15/150
+Train Loss: 1.8333 | Acc: 0.9459
+Val   Loss: 1.8673 | Acc: 0.8601
+New best model saved
+
+Epoch 16/150
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]Train Loss: 1.8203 | Acc: 0.9524
+Val   Loss: 1.8613 | Acc: 0.8741
+New best model saved
+
+Epoch 17/150
+Train Loss: 1.8102 | Acc: 0.9524
+Val   Loss: 1.8464 | Acc: 0.8881
+New best model saved
+
+Epoch 18/150
+Train Loss: 1.8010 | Acc: 0.9618
+Val   Loss: 1.8434 | Acc: 0.8671
+New best model saved
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 19/150
+Train Loss: 1.7934 | Acc: 0.9610
+Val   Loss: 1.8357 | Acc: 0.8741
+New best model saved
+
+Epoch 20/150
+Train Loss: 1.7874 | Acc: 0.9567
+Val   Loss: 1.8213 | Acc: 0.8951
+New best model saved
+
+Epoch 21/150
+Train Loss: 1.7838 | Acc: 0.9582
+Val   Loss: 1.8261 | Acc: 0.8741
+Patience: 1/15
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 22/150
+Train Loss: 1.7724 | Acc: 0.9711
+Val   Loss: 1.8156 | Acc: 0.8811
+New best model saved
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 23/150
+Train Loss: 1.7701 | Acc: 0.9618
+Val   Loss: 1.8054 | Acc: 0.8741
+New best model saved
+
+Epoch 24/150
+Train Loss: 1.7670 | Acc: 0.9697
+Val   Loss: 1.8162 | Acc: 0.8601
+Patience: 1/15
+
+Epoch 25/150
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]Train Loss: 1.7631 | Acc: 0.9632
+Val   Loss: 1.7969 | Acc: 0.8951
+New best model saved
+
+Epoch 26/150
+Train Loss: 1.7608 | Acc: 0.9589
+Val   Loss: 1.7981 | Acc: 0.8916
+Patience: 1/15
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 27/150
+Train Loss: 1.7570 | Acc: 0.9668
+Val   Loss: 1.8010 | Acc: 0.8916
+Patience: 2/15
+
+Epoch 28/150
+Train Loss: 1.7528 | Acc: 0.9625
+Val   Loss: 1.7906 | Acc: 0.8986
+New best model saved
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 29/150
+Train Loss: 1.7517 | Acc: 0.9646
+Val   Loss: 1.7951 | Acc: 0.8846
+Patience: 1/15
+
+Epoch 30/150
+Train Loss: 1.7504 | Acc: 0.9719
+Val   Loss: 1.7894 | Acc: 0.8881
+New best model saved
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 31/150
+Train Loss: 1.7451 | Acc: 0.9769
+Val   Loss: 1.7843 | Acc: 0.9021
+New best model saved
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 32/150
+Train Loss: 1.7438 | Acc: 0.9726
+Val   Loss: 1.7993 | Acc: 0.8951
+Patience: 1/15
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 33/150
+Train Loss: 1.7436 | Acc: 0.9719
+Val   Loss: 1.7897 | Acc: 0.8881
+Patience: 2/15
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 34/150
+Train Loss: 1.7432 | Acc: 0.9711
+Val   Loss: 1.7889 | Acc: 0.8916
+Patience: 3/15
+
+Epoch 35/150
+Train Loss: 1.7397 | Acc: 0.9762
+Val   Loss: 1.7791 | Acc: 0.9056
+New best model saved
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 36/150
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]Train Loss: 1.7390 | Acc: 0.9755
+Val   Loss: 1.7818 | Acc: 0.9056
+Patience: 1/15
+
+Epoch 37/150
+Train Loss: 1.7394 | Acc: 0.9755
+Val   Loss: 1.7814 | Acc: 0.9056
+Patience: 2/15
+
+Epoch 38/150
+Train Loss: 1.7389 | Acc: 0.9812
+Val   Loss: 1.7989 | Acc: 0.8811
+Patience: 3/15
+
+Epoch 39/150
+Train Loss: 1.7367 | Acc: 0.9733
+Val   Loss: 1.7758 | Acc: 0.8881
+New best model saved
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 40/150
+Train Loss: 1.7367 | Acc: 0.9762
+Val   Loss: 1.7821 | Acc: 0.8951
+Patience: 1/15
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 41/150
+Train Loss: 1.7357 | Acc: 0.9784
+Val   Loss: 1.7759 | Acc: 0.8916
+Patience: 2/15
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 42/150
+Train Loss: 1.7351 | Acc: 0.9776
+Val   Loss: 1.7770 | Acc: 0.8881
+Patience: 3/15
+
+Epoch 43/150
+Train Loss: 1.7355 | Acc: 0.9726
+Val   Loss: 1.7755 | Acc: 0.9056
+New best model saved
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 44/150
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]Train Loss: 1.7328 | Acc: 0.9827
+Val   Loss: 1.7804 | Acc: 0.8951
+Patience: 1/15
+
+Epoch 45/150
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]Train Loss: 1.7316 | Acc: 0.9784
+Val   Loss: 1.7774 | Acc: 0.9091
+Patience: 2/15
+
+Epoch 46/150
+Train Loss: 1.7336 | Acc: 0.9798
+Val   Loss: 1.7822 | Acc: 0.9056
+Patience: 3/15
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 47/150
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]Train Loss: 1.7341 | Acc: 0.9726
+Val   Loss: 1.7981 | Acc: 0.8671
+Patience: 4/15
+
+Epoch 48/150
+Train Loss: 1.7333 | Acc: 0.9719
+Val   Loss: 1.7782 | Acc: 0.8881
+Patience: 5/15
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 49/150
+Train Loss: 1.7309 | Acc: 0.9812
+Val   Loss: 1.7778 | Acc: 0.8881
+Patience: 6/15
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 50/150
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]Train Loss: 1.7296 | Acc: 0.9848
+Val   Loss: 1.7813 | Acc: 0.8916
+Patience: 7/15
+
+Epoch 51/150
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]Train Loss: 1.7331 | Acc: 0.9762
+Val   Loss: 1.7805 | Acc: 0.8986
+Patience: 8/15
+
+Epoch 52/150
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]Train Loss: 1.7302 | Acc: 0.9812
+Val   Loss: 1.7838 | Acc: 0.8951
+Patience: 9/15
+
+Epoch 53/150
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]Train Loss: 1.7286 | Acc: 0.9820
+Val   Loss: 1.7757 | Acc: 0.9021
+Patience: 10/15
+
+Epoch 54/150
+Train Loss: 1.7283 | Acc: 0.9805
+Val   Loss: 1.7806 | Acc: 0.8986
+Patience: 11/15
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 55/150
+Train Loss: 1.7323 | Acc: 0.9762
+Val   Loss: 1.7788 | Acc: 0.8951
+Patience: 12/15
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]
+Epoch 56/150
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]Train Loss: 1.7270 | Acc: 0.9863
+Val   Loss: 1.7823 | Acc: 0.8986
+Patience: 13/15
+
+Epoch 57/150
+Train:   0%|          | 0/1386 [00:00<?, ?it/s]Train Loss: 1.7289 | Acc: 0.9769
+Val   Loss: 1.7824 | Acc: 0.8916
+Patience: 14/15
+
+Epoch 58/150
+Train Loss: 1.7271 | Acc: 0.9805
+Val   Loss: 1.7817 | Acc: 0.8881
+Patience: 15/15
+Early stopping triggered
+                                                        
+===== FINAL TEST =====
+Test Loss: 1.7703
+Test Acc : 0.9068
+
+===== CLASSIFICATION REPORT =====
+              precision    recall  f1-score   support
+
+          J9     1.0000    0.5556    0.7143         9
+     Kashtan     0.9324    0.9928    0.9617       139
+          M0     0.0000    0.0000    0.0000         0
+          M9     0.0000    0.0000    0.0000         0
+          O1     0.0000    0.0000    0.0000         0
+          O7     0.0000    0.0000    0.0000         0
+          P0     0.9412    0.7273    0.8205        22
+          P1     0.8475    0.8929    0.8696        56
+          P8     0.0000    0.0000    0.0000         0
+          Q7     0.0000    0.0000    0.0000         0
+          R3     0.0000    0.0000    0.0000         0
+          T0     0.0000    0.0000    0.0000         0
+          T1     0.0000    0.0000    0.0000         0
+          T9     1.0000    1.0000    1.0000        17
+          U7     0.8615    0.8235    0.8421        68
+          U9     0.0000    0.0000    0.0000         0
+          W4     0.0000    0.0000    0.0000         0
+          X0     0.0000    0.0000    0.0000         0
+
+    accuracy                         0.9068       311
+   macro avg     0.3101    0.2773    0.2893       311
+weighted avg     0.9079    0.9068    0.9039       311
+
+
+===== CONFUSION MATRIX =====
+[[  5   0   0   0   0   4]
+ [  0 138   0   1   0   0]
+ [  0   5  16   0   0   1]
+ [  0   1   1  50   0   4]
+ [  0   0   0   0  17   0]
+ [  0   4   0   8   0  56]]
+
+Process finished with exit code 0
