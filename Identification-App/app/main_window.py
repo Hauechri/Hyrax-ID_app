@@ -6,7 +6,9 @@ pipeline runs for minutes per file and only communicates via stdout, so the
 log is the primary "what's happening, and what did it find" surface.
 
 All four models (including the denoiser) are selected as file paths by the
-user -- there is no online download step. Advanced pipeline parameters
+user -- there is no online download step. The denoiser and the animal
+classifier are optional: each has a checkbox, and its model path is only
+required (and only used) while that box is ticked. Advanced pipeline parameters
 (window/hop size, thresholds, etc.) are exposed as editable fields, and the
 whole left-hand configuration can be saved to / loaded from a .cfg file.
 """
@@ -41,7 +43,7 @@ from PySide6.QtWidgets import (
 )
 
 import paths
-from results_model import ResultsModel
+from results_model import COLUMNS, ResultsModel
 from worker import InferenceWorker
 
 # Advanced pipeline parameters exposed in the UI, matching
@@ -72,6 +74,17 @@ MODEL_PATH_FIELDS = [
     ("denoiser", "Denoiser model", paths.DENOISER_ACA_MODEL_PATH),
 ]
 
+# Models that belong to an optional pipeline stage:
+#   model prefix -> (stage key, checkbox text). The stage key is also the
+#   run_batch() keyword and the key used in the .cfg file.
+OPTIONAL_MODEL_STAGES = {
+    "denoiser": ("denoise", "Denoise (denoiser model)"),
+    "animal_classifier": ("classify", "Classify animals (classifier model)"),
+}
+
+# Advanced settings that only mean something while denoising is on.
+DENOISER_PARAM_NAMES = ("Denoiser_sequence_length", "Denoiser_num_worker")
+
 CFG_SECTION = "hyraxid"
 
 
@@ -93,6 +106,8 @@ class MainWindow(QMainWindow):
 
         self._advanced_widgets = {}  # name -> widget
         self._model_path_edits = {}  # prefix -> QLineEdit
+        self._model_browse_buttons = {}  # prefix -> QPushButton
+        self._stage_checkboxes = {}  # stage key ("denoise"/"classify") -> QCheckBox
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         self.setCentralWidget(splitter)
@@ -121,6 +136,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._build_models_group())
         layout.addWidget(self._build_device_group())
         layout.addWidget(self._build_advanced_group())
+        self._sync_stage_widgets()  # models + advanced group both exist now
 
         button_row = QHBoxLayout()
         self.start_button = QPushButton("Start")
@@ -188,6 +204,9 @@ class MainWindow(QMainWindow):
         for prefix, _label, _default in MODEL_PATH_FIELDS:
             section[f"{prefix}_model_path"] = self._model_path_edits[prefix].text()
 
+        for stage_key, checkbox in self._stage_checkboxes.items():
+            section[stage_key] = str(checkbox.isChecked())
+
         for name, kind, _default, _kwargs in ADVANCED_PARAM_SPECS:
             widget = self._advanced_widgets[name]
             if kind == "bool":
@@ -238,6 +257,14 @@ class MainWindow(QMainWindow):
             value = section.get(f"{prefix}_model_path")
             if value is not None:
                 self._model_path_edits[prefix].setText(value)
+
+        # Older .cfg files have no denoise/classify keys: leave those boxes as they are.
+        for stage_key, checkbox in self._stage_checkboxes.items():
+            if stage_key in section:
+                try:
+                    checkbox.setChecked(section.getboolean(stage_key))
+                except ValueError:
+                    pass
 
         for name, kind, _default, _kwargs in ADVANCED_PARAM_SPECS:
             if name not in section:
@@ -312,8 +339,17 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(group)
 
         for prefix, label, default in MODEL_PATH_FIELDS:
-            row_label = QLabel(label)
-            layout.addWidget(row_label)
+            stage = OPTIONAL_MODEL_STAGES.get(prefix)
+            if stage is None:
+                layout.addWidget(QLabel(label))
+            else:
+                # Optional stage: the checkbox is the field's heading.
+                stage_key, stage_text = stage
+                checkbox = QCheckBox(stage_text)
+                checkbox.setChecked(True)
+                checkbox.toggled.connect(self._sync_stage_widgets)
+                layout.addWidget(checkbox)
+                self._stage_checkboxes[stage_key] = checkbox
 
             row = QHBoxLayout()
             edit = QLineEdit()
@@ -325,8 +361,26 @@ class MainWindow(QMainWindow):
             layout.addLayout(row)
 
             self._model_path_edits[prefix] = edit
+            self._model_browse_buttons[prefix] = browse_button
 
         return group
+
+    def _model_stage_enabled(self, prefix):
+        """True if this model is needed for the current run (always true for
+        the non-optional models)."""
+        stage = OPTIONAL_MODEL_STAGES.get(prefix)
+        return True if stage is None else self._stage_checkboxes[stage[0]].isChecked()
+
+    def _sync_stage_widgets(self, _checked=None):
+        """Grey out the path field / settings of any stage that is switched off."""
+        for prefix in OPTIONAL_MODEL_STAGES:
+            enabled = self._model_stage_enabled(prefix)
+            self._model_path_edits[prefix].setEnabled(enabled)
+            self._model_browse_buttons[prefix].setEnabled(enabled)
+
+        denoise_on = self._stage_checkboxes["denoise"].isChecked()
+        for name in DENOISER_PARAM_NAMES:
+            self._advanced_widgets[name].setEnabled(denoise_on)
 
     def _browse_model_path(self, line_edit):
         path, _ = QFileDialog.getOpenFileName(self, "Select model file")
@@ -449,17 +503,19 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Missing input", "Please select an input and an output folder.")
             return
 
-        missing = [
-            label
-            for prefix, label, _default in MODEL_PATH_FIELDS
-            if not self._model_path_edits[prefix].text().strip()
-            or not os.path.isfile(self._model_path_edits[prefix].text().strip())
-        ]
+        # Only the models of enabled stages are needed.
+        missing = []
+        for prefix, label, _default in MODEL_PATH_FIELDS:
+            if not self._model_stage_enabled(prefix):
+                continue
+            model_path = self._model_path_edits[prefix].text().strip()
+            if not model_path or not os.path.isfile(model_path):
+                missing.append(label)
         if missing:
             QMessageBox.warning(
                 self,
                 "Missing model file(s)",
-                "Please point every model field at a valid file:\n" + "\n".join(missing),
+                "Please point every enabled model at a valid file:\n" + "\n".join(missing),
             )
             return
 
@@ -481,6 +537,11 @@ class MainWindow(QMainWindow):
         self.slice_progress_bar.setRange(0, 0)  # indeterminate until the first slice_progress arrives
         self.timing_row.setVisible(True)
 
+        denoise = self._stage_checkboxes["denoise"].isChecked()
+        classify = self._stage_checkboxes["classify"].isChecked()
+        # Without classification there is no animal to show.
+        self.results_table.setColumnHidden(COLUMNS.index("Animal"), not classify)
+
         self._run_start_time = time.monotonic()
         self._file_slice_start_time = None
         self._latest_slice_progress = None
@@ -492,8 +553,12 @@ class MainWindow(QMainWindow):
             output_path=output_path,
             detector_model_path=self._model_path_edits["detector"].text().strip(),
             garbage_filter_model_path=self._model_path_edits["garbage_filter"].text().strip(),
-            animal_classifier_model_path=self._model_path_edits["animal_classifier"].text().strip(),
-            denoiser_model_path=self._model_path_edits["denoiser"].text().strip(),
+            animal_classifier_model_path=(
+                self._model_path_edits["animal_classifier"].text().strip() if classify else None
+            ),
+            denoiser_model_path=self._model_path_edits["denoiser"].text().strip() if denoise else None,
+            denoise=denoise,
+            classify=classify,
             device_override=self.device_combo.currentData(),
             **self._collect_param_overrides(),
         )
@@ -559,8 +624,10 @@ class MainWindow(QMainWindow):
         self._file_summaries[stem] = summary
         parts = []
         for name, s in self._file_summaries.items():
-            if s["top_animal"] is None:
-                parts.append(f"{name}: no animal identified")
+            if s["n_bouts"] == 0:
+                parts.append(f"{name}: no bouts detected")
+            elif s["top_animal"] is None:
+                parts.append(f"{name}: {s['n_bouts']} bout(s) detected")
             else:
                 parts.append(f"{name}: {s['top_animal']}")
         self.headline_label.setText("  |  ".join(parts))
@@ -583,4 +650,4 @@ class MainWindow(QMainWindow):
             self._thread.quit()
             self._thread.wait()
         self._worker = None
-        self._thread = None
+        self._thread = None

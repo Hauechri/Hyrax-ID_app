@@ -118,10 +118,21 @@ class InferenceWorker(QObject):
                     }
                 )
 
+            classified = [b for b in bouts if b["animal"] is not None]
+            if not classified:
+                # Classification was switched off for this run: the bouts
+                # are real, there's just no animal ID to report.
+                self.log_line.emit(f"RESULT: {stem}: {len(bouts)} bout(s) detected (classification off)")
+                self.file_finished.emit(
+                    stem,
+                    {"top_animal": None, "top_confidence": 0.0, "n_bouts": len(bouts), "label_path": label_path},
+                )
+                continue
+
             # Highest-confidence bout is used to pick "the" answer, but the
             # confidence number itself isn't shown -- it's not meaningful to
             # someone reading the result and was confusing rather than useful.
-            top = max(bouts, key=lambda b: b["confidence"])
+            top = max(classified, key=lambda b: b["confidence"])
             self.log_line.emit(f"RESULT: {stem}: identified as {top['animal']}, {len(bouts)} bout(s) total")
             self.file_finished.emit(
                 stem,
