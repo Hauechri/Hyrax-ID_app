@@ -1,0 +1,100 @@
+D:\0_PHD\Hyrax\venv\Scripts\python.exe D:/0_PHD/Hyrax/BoutGarbageCollector/Scripts/GB_Boost/train.py
+
+============================
+ GC TRAINING PIPELINE START 
+============================
+
+Loading dataset from: D:/0_PHD/Hyrax/BoutGarbageCollector/AUDIO/ACA/GoodTargetGarbage/BoostDATASET/train
+240531_0080.npz: 154 samples
+240531_0081.npz: 79 samples
+240702_0093.npz: 214 samples
+250306_0132.npz: 240 samples
+250423_0148.npz: 111 samples
+250501_0165.npz: 209 samples
+
+==============================
+Total files: 6
+Total samples: 1007
+==============================
+
+Loading dataset from: D:/0_PHD/Hyrax/BoutGarbageCollector/AUDIO/ACA/GoodTargetGarbage/BoostDATASET/val
+250306_0129.npz: 164 samples
+250423_0150.npz: 100 samples
+
+==============================
+Total files: 2
+Total samples: 264
+==============================
+
+Loading dataset from: D:/0_PHD/Hyrax/BoutGarbageCollector/AUDIO/ACA/GoodTargetGarbage/BoostDATASET/test
+240514_0056.npz: 51 samples
+240713_0108.npz: 66 samples
+250427_0159.npz: 95 samples
+
+==============================
+Total files: 3
+Total samples: 212
+==============================
+
+============================
+ DATASET STATS 
+============================
+
+Train samples: 1007
+Val samples:   264
+Test samples:  212
+
+KEEP ratio:
+Train: 0.843
+Val:   0.409
+Test:  0.745
+
+Creating model...
+Training model...
+
+============================
+ VALIDATION EVALUATION 
+============================
+
+Classification Report:
+
+              precision    recall  f1-score   support
+
+           0       0.74      0.48      0.58       156
+           1       0.50      0.76      0.61       108
+
+    accuracy                           0.59       264
+   macro avg       0.62      0.62      0.59       264
+weighted avg       0.64      0.59      0.59       264
+
+Confusion Matrix:
+
+[[75 81]
+ [26 82]]
+
+============================
+ FINAL TEST EVALUATION 
+============================
+
+Classification Report:
+
+              precision    recall  f1-score   support
+
+           0       0.89      0.74      0.81        54
+           1       0.92      0.97      0.94       158
+
+    accuracy                           0.91       212
+   macro avg       0.90      0.85      0.87       212
+weighted avg       0.91      0.91      0.91       212
+
+Confusion Matrix:
+
+[[ 40  14]
+ [  5 153]]
+
+Saving model...
+Saved model to: D:/0_PHD/Hyrax/BoutGarbageCollector/AUDIO/ACA/GoodTargetGarbage/GarbageCollectorModel/Boost/XGBRich.joblib
+
+Done.
+
+Process finished with exit code 0

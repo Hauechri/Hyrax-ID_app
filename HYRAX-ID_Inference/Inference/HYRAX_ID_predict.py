@@ -491,7 +491,10 @@ def merge_overlapping_labels(label_list, overlap_threshold=0.5, min_fraction_kee
 
 
 def group_bouts(merged_labels, interarrival_threshold=1.0):
-    """Group merged labels into bouts based on interarrival time."""
+    """Group merged labels into bouts based on interarrival time.
+
+    A label with cls == 2 always starts a new bout.
+    """
     if not merged_labels:
         return []
 
@@ -504,16 +507,28 @@ def group_bouts(merged_labels, interarrival_threshold=1.0):
 
     for i in range(1, len(merged_labels)):
         start, end, cls, conf = merged_labels[i]
+
         gap = start - bout_end
-        if gap <= interarrival_threshold:
-            bout_end = max(bout_end, end)
-        else:
-            bouts.append((bout_start, bout_end, "BOUT", float(bout_number)))
+
+        if cls == 2 or gap > interarrival_threshold:
+            # Finish the current bout
+            bouts.append(
+                (bout_start, bout_end, "BOUT", float(bout_number))
+            )
             bout_number += 1
+
+            # Start a new bout with the current label
             bout_start = start
             bout_end = end
+        else:
+            # Continue the current bout
+            bout_end = max(bout_end, end)
 
-    bouts.append((bout_start, bout_end, "BOUT", float(bout_number)))
+    # Append the final bout
+    bouts.append(
+        (bout_start, bout_end, "BOUT", float(bout_number))
+    )
+
     return bouts
 
 

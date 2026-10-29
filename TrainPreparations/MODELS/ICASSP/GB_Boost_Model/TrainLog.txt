@@ -1,0 +1,238 @@
+C:\PHD\SideProjects\.venv\Scripts\python.exe C:\PHD\SideProjects\BoutGarbageCollector\Scripts\GB_Boost\train.py 
+
+============================
+ GC TRAINING PIPELINE START 
+============================
+
+Loading dataset from: C:/PHD/SideProjectsData/IcasspExperiments/YOLOExperiments/TrainingData/BoostTrain/BoostDataset/train
+J9_Take119_J9_300408.npz: 204 samples
+J9_Take172_J9.npz: 180 samples
+Kashtan_Take144_Kashtan_230309.npz: 297 samples
+Kashtan_Take146_Kashtan_230309.npz: 215 samples
+Kashtan_Take170_A9&Kashtan_210611.npz: 736 samples
+Kashtan_Take177_Kashtan_300611.npz: 231 samples
+Kashtan_Take225_160412_7893.npz: 322 samples
+Kashtan_Take226_240412_7893.npz: 980 samples
+Kashtan_Take228_240412_7893.npz: 234 samples
+Kashtan_Take255_110612_7893.npz: 180 samples
+Kashtan_Take255_Kashtan_160709.npz: 238 samples
+Kashtan_Take256_Kashtan_160709.npz: 142 samples
+Kashtan_Take257_Kashtan_160709.npz: 143 samples
+Kashtan_Take259_Kashtan_160709.npz: 91 samples
+Kashtan_Take282_050712_7893.npz: 263 samples
+Kashtan_Take283_050712_7893.npz: 149 samples
+Kashtan_Take366_Kashtan_060710.npz: 106 samples
+Kashtan_Take370_Kashtan_joined_060710.npz: 234 samples
+M0_Take117_M0_050808.npz: 34 samples
+M0_Take242_M0_300609.npz: 102 samples
+M0_Take244_M0_300609.npz: 192 samples
+M0_Take72_M0_230708.npz: 21 samples
+M0_Take73_M0_230708.npz: 15 samples
+M9_Take113_M9_240603.npz: 74 samples
+M9_Take121_M9_290704.npz: 148 samples
+M9_Take125_M9_250804.npz: 136 samples
+M9_Take34_M9_120602.npz: 153 samples
+M9_Take43_M9_030602.npz: 89 samples
+O7_Take35_O7_130602.npz: 270 samples
+O7_Take46_O7_030702.npz: 330 samples
+O7_Take47_O7_050702.npz: 173 samples
+P0_Take150_P0_170608.npz: 29 samples
+P0_Take151_P0_170608.npz: 126 samples
+P0_Take152_P0_170608.npz: 21 samples
+P0_Take154_P0_170608.npz: 7 samples
+P0_Take159_P0_070409.npz: 107 samples
+P0_Take160_P0_070409.npz: 40 samples
+P0_Take281_P0_300709.npz: 17 samples
+P0_Take282_P0_300709.npz: 72 samples
+P0_Take287_P0_300709.npz: 51 samples
+P0_Take316_P0_050510.npz: 43 samples
+P1_Take23_P1_110507.npz: 385 samples
+P1_Take49_P1_130607.npz: 67 samples
+P1_Take52_P1_130607.npz: 1029 samples
+P1_Take59+60_P1_140607.npz: 43 samples
+P8_Take130_P8_020511.npz: 380 samples
+P8_Take131_P8_020511.npz: 133 samples
+P8_Take140_P8_120511.npz: 156 samples
+P8_Take141_P8_120511.npz: 70 samples
+P8_Take148_P8_130511.npz: 182 samples
+P8_Take152_P8_240511.npz: 192 samples
+P8_Take164_P8_300511.npz: 223 samples
+P8_Take188_P8_130711.npz: 179 samples
+P8_Take207_P8_170711.npz: 112 samples
+P8_Take243_P8_300609.npz: 64 samples
+P8_Take244_P8_300609.npz: 180 samples
+P8_Take294_150712_1301.npz: 208 samples
+P8_Take376_P8_260710.npz: 65 samples
+P8_Take381_P8_260710.npz: 47 samples
+P8_Take391_P8_050810.npz: 79 samples
+P8_Take97_P8_250707.npz: 70 samples
+T0_Take139_T0.npz: 24 samples
+T0_Take203_T0_180711.npz: 124 samples
+T0_Take236_150512_1593.npz: 133 samples
+T0_Take237_150512_1593.npz: 132 samples
+T0_Take239_220512_1593.npz: 181 samples
+T0_Take243_230512_1593.npz: 166 samples
+T0_Take244_230512_1593.npz: 47 samples
+T0_Take269_270612_1593.npz: 150 samples
+T0_Take312_200712_1593.npz: 352 samples
+T0_Take389_110313_T0.npz: 111 samples
+T0_Take411_2013_T0+U8.npz: 348 samples
+T0_Take420_2013_T0.npz: 120 samples
+T1_Take63_T1_120802.npz: 104 samples
+T9_Take174_T9_280611.npz: 183 samples
+T9_Take303_T9_260410.npz: 147 samples
+U7_Take124_U7_120508.npz: 795 samples
+U7_Take135_U7_020608.npz: 12 samples
+U7_Take137_U7_020608.npz: 28 samples
+U7_Take138_U7_120808.npz: 29 samples
+U7_Take142_U7_020608.npz: 88 samples
+U7_Take143_U7_020608.npz: 53 samples
+U7_Take195_U7_270509.npz: 355 samples
+U7_Take288_U7_300709.npz: 11 samples
+U7_Take395_U7_100810.npz: 23 samples
+U9_Take230_U9_220609.npz: 88 samples
+U9_Take231_U9_220609.npz: 129 samples
+W4_Take242_W4_300609.npz: 102 samples
+W4_Take243_W4_300609.npz: 64 samples
+W4_Take244_W4_300609.npz: 180 samples
+W4_Take247_W4_300609.npz: 71 samples
+W4_Take77_W4_240708.npz: 28 samples
+W4_Take79_W4_240708.npz: 5 samples
+W4_Take88_W4_unknown_290708.npz: 48 samples
+X0_Take201_X0_170711.npz: 127 samples
+
+==============================
+Total files: 95
+Total samples: 15617
+==============================
+
+Loading dataset from: C:/PHD/SideProjectsData/IcasspExperiments/YOLOExperiments/TrainingData/BoostTrain/BoostDataset/val
+Kashtan_Take166_maybeKashtan.npz: 124 samples
+Kashtan_Take169_Kashtan_210611.npz: 349 samples
+Kashtan_Take254_Kashtan_160709.npz: 197 samples
+Kashtan_Take258_Kashtan_160709.npz: 115 samples
+Kashtan_Take301_Kashtan_150410.npz: 201 samples
+M0_Take243_M0_300609.npz: 64 samples
+M0_Take71_M0_230708.npz: 19 samples
+M9_Take120_M9_070704.npz: 152 samples
+O7_Take45_O7_040602.npz: 452 samples
+P0_Take279_P0_300709.npz: 54 samples
+P0_Take280_P0_300709.npz: 58 samples
+P1_Take124+125+126_P1_140508.npz: 454 samples
+P8_Take157_P8_250511.npz: 231 samples
+P8_Take199_maybeP8_160711.npz: 214 samples
+P8_Take242_P8_300609.npz: 102 samples
+T0_Take249_240512_1593.npz: 142 samples
+T0_Take288_110712_1593.npz: 63 samples
+T0_Take394_120313_T0.npz: 108 samples
+T0_Take419_2013_T0.npz: 120 samples
+T9_Take276_T9_300709.npz: 20 samples
+U7_Take136_U7_020608.npz: 41 samples
+U7_Take137_U7_120808.npz: 67 samples
+U7_Take141_U7_020608.npz: 67 samples
+U7_Take202_U7_010609.npz: 5 samples
+U7_Take371_U7_060710.npz: 119 samples
+U9_Take102_U9_290708.npz: 30 samples
+W4_Take80_W4_240708.npz: 68 samples
+W4_Take85_W4_290708.npz: 11 samples
+W4_Take90_W4_290708.npz: 24 samples
+
+==============================
+Total files: 29
+Total samples: 3671
+==============================
+
+Loading dataset from: C:/PHD/SideProjectsData/IcasspExperiments/YOLOExperiments/TrainingData/BoostTrain/BoostDataset/test
+Kashtan_Take143_Kashtan_230309.npz: 207 samples
+Kashtan_Take181_Kashtan_060711.npz: 577 samples
+Kashtan_Take219_Kashtan_080811.npz: 149 samples
+M0_Take114_M0_040808.npz: 42 samples
+M0_Take70_M0_230708.npz: 34 samples
+M9_Take119_M9_220604.npz: 164 samples
+O7_Take36_O7_120602.npz: 96 samples
+P0_Take149_P0_170608.npz: 12 samples
+P0_Take283_P0_300709.npz: 21 samples
+P0_Take284_P0_300709.npz: 73 samples
+P1_Take53_P1_130607.npz: 346 samples
+P8_Take136_P8_110511.npz: 132 samples
+P8_Take156_P8_240511.npz: 153 samples
+P8_Take158_P8_250511.npz: 224 samples
+T0_Take242_220512_1593.npz: 224 samples
+T0_Take374_T0_260710.npz: 28 samples
+T0_Take390_110313_T0.npz: 129 samples
+T1_Take62_T1_310702.npz: 77 samples
+T9_Take275_T9_300709.npz: 67 samples
+U7_Take139_U7_020608.npz: 110 samples
+U7_Take277_U7_300709.npz: 28 samples
+U7_Take369_U7_060710.npz: 163 samples
+U9_Take103_U9_300707.npz: 74 samples
+W4_Take87_W4_unknown_290708.npz: 34 samples
+W4_Take89_W4_unknown_290708.npz: 80 samples
+
+==============================
+Total files: 25
+Total samples: 3244
+==============================
+
+============================
+ DATASET STATS 
+============================
+
+Train samples: 15617
+Val samples:   3671
+Test samples:  3244
+
+KEEP ratio:
+Train: 0.672
+Val:   0.797
+Test:  0.784
+
+Creating model...
+Training model...
+
+============================
+ VALIDATION EVALUATION 
+============================
+
+Classification Report:
+
+              precision    recall  f1-score   support
+
+           0       0.81      0.73      0.76       747
+           1       0.93      0.96      0.94      2924
+
+    accuracy                           0.91      3671
+   macro avg       0.87      0.84      0.85      3671
+weighted avg       0.91      0.91      0.91      3671
+
+Confusion Matrix:
+
+[[ 542  205]
+ [ 129 2795]]
+
+============================
+ FINAL TEST EVALUATION 
+============================
+
+Classification Report:
+
+              precision    recall  f1-score   support
+
+           0       0.82      0.69      0.75       701
+           1       0.92      0.96      0.94      2543
+
+    accuracy                           0.90      3244
+   macro avg       0.87      0.83      0.84      3244
+weighted avg       0.90      0.90      0.90      3244
+
+Confusion Matrix:
+
+[[ 487  214]
+ [ 110 2433]]
+
+Saving model...
+Saved model to: C:/PHD/SideProjectsData/IcasspExperiments/YOLOExperiments/TrainingData/GB_Boost_Model/XGBRich.joblib
+
+Done.
+
+Process finished with exit code 0
