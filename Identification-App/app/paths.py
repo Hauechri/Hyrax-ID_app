@@ -20,6 +20,7 @@ MODELS_DIR = os.path.join(APP_DIR, "models")
 DETECTOR_MODEL_PATH = os.path.join(MODELS_DIR, "detector", "best.pt")
 GARBAGE_FILTER_MODEL_PATH = os.path.join(MODELS_DIR, "boost", "XGBRich.joblib")
 ANIMAL_CLASSIFIER_MODEL_PATH = os.path.join(MODELS_DIR, "ecapa_tdnn", "best_model.pt")
+DENOISER_ACA_MODEL_PATH = os.path.join(MODELS_DIR, "animal-clean", "01_ACS.pk")
 
 if ENGINE_DIR not in sys.path:
     sys.path.insert(0, ENGINE_DIR)

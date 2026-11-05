@@ -53,6 +53,10 @@ def parse_bout_results(label_path):
     Parse a *_labels.txt file written by run_pipeline() into structured bout
     dicts: [{"bout_id", "start", "end", "animal", "confidence", "elements": [...]}, ...]
 
+    If the run had classification disabled, bout headers are just "BOUT{n}"
+    with no animal/confidence; those bouts come back with animal=None and
+    confidence=None.
+
     NOTE: HYRAX_ID_predict.py's own parse_annotation_file()/assign_elements_to_bouts()
     target an older ground-truth label format ("BOUT_1", no animal/confidence
     suffix) and raise ValueError on the pipeline's actual output format
@@ -76,13 +80,19 @@ def parse_bout_results(label_path):
                 start_s, end_s, label = line.split("\t")
                 start, end = float(start_s), float(end_s)
                 if label.startswith("BOUT"):
-                    bout_id_s, animal, conf_s = label[len("BOUT"):].split("_", 2)
+                    parts = label[len("BOUT"):].split("_", 2)
+                    if len(parts) == 3:
+                        bout_id_s, animal, conf_s = parts
+                        confidence = float(conf_s)
+                    else:
+                        # classification was disabled: bare "BOUT{n}"
+                        bout_id_s, animal, confidence = parts[0], None, None
                     current = {
                         "bout_id": int(bout_id_s),
                         "start": start,
                         "end": end,
                         "animal": animal,
-                        "confidence": float(conf_s),
+                        "confidence": confidence,
                         "elements": [],
                     }
                     bouts.append(current)
@@ -111,16 +121,27 @@ def run_batch(
     device_override=None,
     cancel_event=None,
     debug_denoised_dir=None,
+    denoise=True,
+    classify=True,
     **param_overrides,
 ):
     """
     Run the Hyrax-ID pipeline against either a single .wav file or a folder
     of .wav files -- audio_path may point at either.
 
+    denoise / classify switch those two stages on or off. A disabled stage
+    does not need its model path (denoiser_model_path /
+    animal_classifier_model_path may be None); an enabled one does.
+
     run_pipeline() itself only knows how to scan a folder; a single file is
     staged into a temporary folder-of-one and cleaned up afterwards, so no
     pipeline logic is duplicated or forked.
     """
+    if denoise and not denoiser_model_path:
+        raise ValueError("Denoising is enabled but no denoiser model path was given.")
+    if classify and not animal_classifier_model_path:
+        raise ValueError("Classification is enabled but no animal classifier model path was given.")
+
     params = {**DEFAULT_PARAMS, **param_overrides}
     audio_path = Path(audio_path)
 
@@ -138,14 +159,16 @@ def run_batch(
         run_pipeline(
             Detector_model_path=str(detector_model_path),
             GarbageFilter_model_path=str(garbage_filter_model_path),
-            Animal_Classifier_model_path=str(animal_classifier_model_path),
-            Denoiser_model_path=str(denoiser_model_path),
+            Animal_Classifier_model_path=str(animal_classifier_model_path) if classify else None,
+            Denoiser_model_path=str(denoiser_model_path) if denoise else None,
             audio_folder=folder,
             output_path=str(output_path),
             num_classes=len(SPEAKER_LIST),
             debug_denoised_dir=debug_denoised_dir,
             device_override=device_override,
             cancel_event=cancel_event,
+            denoise=denoise,
+            classify=classify,
             **params,
         )
     finally:

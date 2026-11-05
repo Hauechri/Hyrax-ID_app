@@ -5,6 +5,12 @@ End-to-end inference pipeline:
                      \\_______________________________________________________________________________/
                                             classification always uses the ORIGINAL audio
 
+The Denoiser and the Animal Classifier are both OPTIONAL (run_pipeline's
+`denoise` / `classify` flags):
+  - denoise=False : the detector runs directly on the original audio.
+  - classify=False: no animal ID is made; the label file contains the bouts
+                    ("BOUT{n}") and their elements only.
+
 For every wav file in `audio_folder`:
   0. Denoise it with the AnimalClean UNet denoiser (same forward pass as predict.py,
      sequence_len=1s, no overlap). The denoised copy is written to `denoised_output_dir`.
@@ -88,7 +94,7 @@ def read_wave_file(filepath):
     if data.ndim > 1:
         data = data.mean(axis=1)  # Convert to mono
     data = data.astype(np.float32)
-    peak = np.max(np.abs(data))
+    peak = np.max(np.abs(data)) if data.size else 0.0
     if peak > 0:
         data /= peak
     return data, rate
@@ -661,8 +667,9 @@ def detect_elements_for_file(
 ):
     """
     Run YOLO detection + GarbageCollector filtering + bout grouping on a
-    single, already-denoised, in-memory signal (peak-normalized float32
-    mono, as returned by denoise_single_file).
+    single in-memory signal (peak-normalized float32 mono) -- the denoised
+    audio as returned by denoise_single_file, or the original audio as
+    returned by read_wave_file when denoising is disabled.
 
     Returns:
         elements (list of (start, end, cls_name, conf)) : surviving elements
@@ -808,15 +815,17 @@ def save_full_audacity_labels(bout_data, output_path):
     """
     Writes one Audacity label file containing, per bout:
       - a bout-level label:    start / end / "BOUT{n}_{animal}_{conf:.3f}"
+                               (or just "BOUT{n}" if the bout was not classified,
+                               i.e. it has no "animal" key)
       - element-level labels:  start / end / "{type}_{conf:.3f}"
     """
     lines = []
     for bout in bout_data:
-        lines.append((
-            bout["start"],
-            bout["end"],
-            f"BOUT{bout['bout_id']}_{bout['animal']}_{bout['animal_confidence']:.3f}",
-        ))
+        if "animal" in bout:
+            bout_label = f"BOUT{bout['bout_id']}_{bout['animal']}_{bout['animal_confidence']:.3f}"
+        else:
+            bout_label = f"BOUT{bout['bout_id']}"
+        lines.append((bout["start"], bout["end"], bout_label))
         for e in bout["elements"]:
             lines.append((e["start"], e["end"], f"{e['type']}_{e['confidence']:.3f}"))
 
@@ -927,8 +936,17 @@ def run_pipeline(
     debug_denoised_dir=None,
     device_override=None,
     cancel_event=None,
+    denoise=True,
+    classify=True,
 ):
     """
+    denoise: if False, the denoiser is not loaded and the detector runs on the
+    original audio. Denoiser_model_path may then be None.
+
+    classify: if False, the animal classifier is not loaded and no animal ID
+    is made -- the label file contains bouts and elements only.
+    Animal_Classifier_model_path may then be None.
+
     debug_denoised_dir: if set, every denoised file is ALSO written here as
     a wav for inspection. Leave as None for the clean, no-tmp-files final
     run -- the pipeline never needs these files itself.
@@ -940,14 +958,25 @@ def run_pipeline(
     cancel_event: an optional threading.Event; checked once per file so a
     caller can request a clean stop between files (not mid-file).
     """
+    # Fail fast, before any (slow) model loading, if a stage is enabled but
+    # has no model to run.
+    if denoise and not Denoiser_model_path:
+        raise ValueError("denoise=True requires Denoiser_model_path.")
+    if classify and not Animal_Classifier_model_path:
+        raise ValueError("classify=True requires Animal_Classifier_model_path.")
+
     if device_override in (None, "auto"):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     else:
         device = torch.device(device_override)
     print(f"[INFO] Using device: {device}")
 
-    denoiser_model, dataOpts = load_denoiser(Denoiser_model_path, device)
-    print(f"[INFO] Denoiser loaded: {Denoiser_model_path}")
+    if denoise:
+        denoiser_model, dataOpts = load_denoiser(Denoiser_model_path, device)
+        print(f"[INFO] Denoiser loaded: {Denoiser_model_path}")
+    else:
+        denoiser_model, dataOpts = None, None
+        print("[INFO] Denoising disabled -- the detector will run on the original audio.")
 
     detector = YOLO(Detector_model_path)
     print(f"[INFO] Detector loaded: {Detector_model_path}")
@@ -957,13 +986,17 @@ def run_pipeline(
     trained_feature_keys = list(gc_data["feature_keys"])
     print(f"[INFO] GarbageCollector loaded: {GarbageFilter_model_path}")
 
-    #classifier = TDNNBoutModel(num_classes=num_classes, input_dim=input_dim, emb_dim=emb_dim)
-    classifier = ECAPATDNNBoutModel(num_classes=num_classes, input_dim=input_dim, emb_dim=emb_dim)
+    if classify:
+        #classifier = TDNNBoutModel(num_classes=num_classes, input_dim=input_dim, emb_dim=emb_dim)
+        classifier = ECAPATDNNBoutModel(num_classes=num_classes, input_dim=input_dim, emb_dim=emb_dim)
 
-    classifier.load_state_dict(torch.load(Animal_Classifier_model_path, map_location=device))
-    classifier.to(device)
-    classifier.eval()
-    print(f"[INFO] Animal classifier loaded: {Animal_Classifier_model_path}")
+        classifier.load_state_dict(torch.load(Animal_Classifier_model_path, map_location=device))
+        classifier.to(device)
+        classifier.eval()
+        print(f"[INFO] Animal classifier loaded: {Animal_Classifier_model_path}")
+    else:
+        classifier = None
+        print("[INFO] Classification disabled -- labels will contain bouts and elements only (no animal ID).")
 
     os.makedirs(output_path, exist_ok=True)
     if debug_denoised_dir is not None:
@@ -979,28 +1012,39 @@ def run_pipeline(
 
         print(f"\n[FILE {file_index + 1}/{len(originals)}] Processing: {stem}")
 
-        debug_path = os.path.join(debug_denoised_dir, f"{stem}.wav") if debug_denoised_dir else None
+        if denoise:
+            debug_path = os.path.join(debug_denoised_dir, f"{stem}.wav") if debug_denoised_dir else None
 
-        denoised_signal, denoised_sr = denoise_single_file(
-            denoiser_model,
-            dataOpts,
-            original_path,
-            Denoiser_sequence_length,
-            Denoiser_num_worker,
-            device,
-            debug_output_path=debug_path,
-        )
+            signal, signal_sr = denoise_single_file(
+                denoiser_model,
+                dataOpts,
+                original_path,
+                Denoiser_sequence_length,
+                Denoiser_num_worker,
+                device,
+                debug_output_path=debug_path,
+            )
 
-        if denoised_signal is None:
-            print(f"  [WARN] {stem}: denoiser produced no output (empty/too-short file?), skipping.")
-            continue
+            if signal is None:
+                print(f"  [WARN] {stem}: denoiser produced no output (empty/too-short file?), skipping.")
+                continue
+        else:
+            # No denoiser: the detector gets the original audio, loaded and
+            # peak-normalized the same way the denoiser's output is.
+            signal, signal_sr = read_wave_file(original_path)
+
+            if signal.size == 0:
+                print(f"  [WARN] {stem}: audio file is empty, skipping.")
+                continue
+            if signal_sr != SR:
+                print(f"  [WARN] {stem}: sample rate {signal_sr} != expected {SR}")
 
         elements, bouts = detect_elements_for_file(
             detector,
             garbagecollector,
             trained_feature_keys,
-            denoised_signal,
-            denoised_sr,
+            signal,
+            signal_sr,
             window_size,
             hop_size,
             image_size,
@@ -1018,11 +1062,13 @@ def run_pipeline(
 
         bout_data = build_bout_data(elements, bouts)
 
-        original_waveform, sr = load_audio(original_path)
-        if sr != SR:
-            print(f"  [WARN] {stem}: sample rate {sr} != expected {SR}")
+        if classify:
+            # Classification always uses the ORIGINAL audio, never the denoised one.
+            original_waveform, sr = load_audio(original_path)
+            if sr != SR and denoise:  # without the denoiser this was already warned about above
+                print(f"  [WARN] {stem}: sample rate {sr} != expected {SR}")
 
-        bout_data = predict_animals_for_file(original_waveform, sr, bout_data, classifier, device)
+            bout_data = predict_animals_for_file(original_waveform, sr, bout_data, classifier, device)
 
         label_output_path = os.path.join(output_path, f"{stem}_labels.txt")
         save_full_audacity_labels(bout_data, label_output_path)
@@ -1060,6 +1106,10 @@ if __name__ == "__main__":
     Denoiser_sequence_length = 1
     Denoiser_num_worker = 0
 
+    # Optional stages. If False, the matching model path below is not needed.
+    Denoise = True
+    Classify = True
+
     Detector_model_path = "C:/PHD/Hyrax-ID_app/HYRAX-ID_Inference/DETECTOR_GB/ACA_26_M_SpecDyn/weights/best.pt"
     GarbageFilter_model_path = "C:/PHD/Hyrax-ID_app/HYRAX-ID_Inference/DETECTOR_GB/Boost/XGBRich.joblib"
     #Animal_Classifier_model_path = "C:/PHD/Hyrax-ID_app/HYRAX-ID_Inference/TDNN_MHA/All_MHA/best_model.pt"
@@ -1096,5 +1146,7 @@ if __name__ == "__main__":
         GB_scoreweight=GB_scoreweight,
         num_classes=len(SPEAKER_LIST),
         input_dim=64,
-        emb_dim=192
-    )
+        emb_dim=192,
+        denoise=Denoise,
+        classify=Classify,
+    )

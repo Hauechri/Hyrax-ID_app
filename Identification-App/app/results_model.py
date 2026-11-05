@@ -41,7 +41,7 @@ class ResultsModel(QAbstractTableModel):
         if col == 1:
             return r["bout_id"]
         if col == 2:
-            return r["animal"]
+            return "" if r["animal"] is None else r["animal"]
         if col == 3:
             return f"{r['start']:.2f}"
         if col == 4:
