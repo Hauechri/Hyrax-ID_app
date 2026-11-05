@@ -539,7 +539,7 @@ def generate_input_image(
         raise ValueError("Audio input is empty.")
 
     # Shared time resolution
-    hop_length = max(1, len(y) // image_size)
+    hop_length = max(1, len(y) // image_size[1])
 
     # --------------------------------------------------------
     # 2. STFT
@@ -576,7 +576,7 @@ def generate_input_image(
     # --------------------------------------------------------
 
     # First resample to the target time resolution.
-    red = resample_cols(red, image_size)
+    red = resample_cols(red, image_size[1])
 
     # Delta is calculated AFTER time resampling.
     green = compute_delta(
@@ -596,19 +596,18 @@ def generate_input_image(
         hop_length
     )
 
-    blue = resample_cols(blue, image_size)
+    blue = resample_cols(blue, image_size[1])
 
     # --------------------------------------------------------
     # 7. Resize frequency axis to image_size
     # --------------------------------------------------------
 
     def resize_frequency(x):
-
         return zoom(
             x,
-            (image_size / x.shape[0], 1),
+            (image_size[0] / x.shape[0], 1),
             order=1
-        )[:image_size, :]
+        )[:image_size[0], :]
 
     red = resize_frequency(red)
     green = resize_frequency(green)
