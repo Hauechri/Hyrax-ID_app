@@ -56,7 +56,6 @@ import librosa
 import scipy.io.wavfile as wav
 from scipy.ndimage import zoom
 from ultralytics import YOLO
-
 import matplotlib
 matplotlib.use('Agg')
 
@@ -294,6 +293,350 @@ def denoise_single_file(model, dataOpts, audio_path, sequence_len_seconds, num_w
 # SPECTROGRAM GENERATION (DETECTOR INPUT)
 # =========================================================
 
+
+
+
+# ============================================================
+# SETTINGS
+# ============================================================
+
+N_FFT = 1024
+N_MELS = 128
+WINDOW = "hann"
+
+DELTA_WIDTH = 9
+
+PCEN_TIME_CONSTANT = 0.06
+PCEN_GAIN = 0.980
+PCEN_BIAS = 2.0
+PCEN_POWER = 0.5
+
+
+# ============================================================
+# STFT
+# ============================================================
+
+def stft_complex(audio, n_fft, hop_length):
+    """
+    Centered STFT, matching the original project's implementation.
+    Returns complex array (frequency, time).
+    """
+
+    pad = n_fft // 2
+
+    x = np.pad(
+        audio,
+        (pad, pad),
+        mode="reflect" if len(audio) > pad else "constant"
+    )
+
+    window = np.hanning(n_fft)
+
+    n_frames = 1 + (len(x) - n_fft) // hop_length
+
+    idx = (
+        np.arange(n_fft)[None, :]
+        + hop_length * np.arange(n_frames)[:, None]
+    )
+
+    return np.fft.rfft(
+        x[idx] * window,
+        axis=1
+    ).T.astype(np.complex64)
+
+
+# ============================================================
+# MEL FILTERBANK
+# ============================================================
+
+def hz_to_mel(f):
+    return 2595.0 * np.log10(1.0 + np.asarray(f) / 700.0)
+
+
+def mel_to_hz(m):
+    return 700.0 * (10 ** (np.asarray(m) / 2595.0) - 1.0)
+
+
+def mel_filterbank(sr, n_fft, n_mels, fmin=0.0, fmax=None):
+
+    if fmax is None:
+        fmax = sr / 2
+
+    freqs = np.linspace(0, sr / 2, n_fft // 2 + 1)
+
+    pts = mel_to_hz(
+        np.linspace(
+            hz_to_mel(fmin),
+            hz_to_mel(fmax),
+            n_mels + 2
+        )
+    )
+
+    fb = np.zeros((n_mels, len(freqs)), dtype=np.float32)
+
+    for i in range(n_mels):
+
+        lo, ce, hi = pts[i], pts[i + 1], pts[i + 2]
+
+        up = (freqs - lo) / max(ce - lo, 1e-9)
+        down = (hi - freqs) / max(hi - ce, 1e-9)
+
+        fb[i] = np.maximum(0, np.minimum(up, down))
+
+    return fb
+
+
+# ============================================================
+# DELTA
+# ============================================================
+
+def compute_delta(x, width=9):
+    """
+    Regression delta along the time axis.
+    Input shape: (frequency, time)
+    """
+
+    half = width // 2
+
+    padded = np.pad(
+        x,
+        ((0, 0), (half, half)),
+        mode="edge"
+    )
+
+    num = sum(
+        n * (
+            padded[:, half + n:padded.shape[1] - half + n]
+            -
+            padded[:, half - n:padded.shape[1] - half - n]
+        )
+        for n in range(1, half + 1)
+    )
+
+    denom = 2 * sum(n * n for n in range(1, half + 1))
+
+    return (num / denom).astype(np.float32)
+
+
+# ============================================================
+# TIME RESAMPLING
+# ============================================================
+
+def resample_cols(spec, n_cols):
+    """
+    Linearly interpolate spectrogram to exactly n_cols columns.
+    """
+
+    old_cols = np.arange(spec.shape[1])
+    new_cols = np.linspace(0, spec.shape[1] - 1, n_cols)
+
+    out = np.empty(
+        (spec.shape[0], n_cols),
+        dtype=np.float32
+    )
+
+    for i in range(spec.shape[0]):
+        out[i] = np.interp(new_cols, old_cols, spec[i])
+
+    return out
+
+
+# ============================================================
+# PCEN
+# ============================================================
+
+def compute_pcen(E, sr, hop_length):
+    """
+    Per-channel energy normalization.
+
+    Matches the original PCEN implementation:
+    smoothing -> gain -> bias -> root.
+    """
+
+    b = 1.0 - np.exp(
+        -hop_length / (sr * PCEN_TIME_CONSTANT)
+    )
+
+    M = np.zeros_like(E)
+
+    M[:, 0] = E[:, 0]
+
+    for t in range(1, E.shape[1]):
+        M[:, t] = (
+            (1.0 - b) * M[:, t - 1]
+            + b * E[:, t]
+        )
+
+    eps = 1e-6
+
+    out = (
+        E / (eps + M) ** PCEN_GAIN
+        + PCEN_BIAS
+    ) ** PCEN_POWER - PCEN_BIAS ** PCEN_POWER
+
+    return out.astype(np.float32)
+
+
+# ============================================================
+# IMAGE NORMALIZATION
+# ============================================================
+
+def normalize_uint8(x):
+    """
+    Independent min-max normalization to uint8.
+    """
+
+    x = np.asarray(x, dtype=np.float32)
+
+    xmin = np.min(x)
+    xmax = np.max(x)
+
+    if xmax - xmin < 1e-9:
+        return np.zeros(x.shape, dtype=np.uint8)
+
+    x = (x - xmin) / (xmax - xmin)
+
+    return (np.clip(x, 0.0, 1.0) * 255).astype(np.uint8)
+
+
+# ============================================================
+# MAIN FUNCTION
+# ============================================================
+
+def generate_input_image(
+    y: np.ndarray,
+    sr: int,
+    image_size: int = 980
+):
+    """
+    Generate a 3-channel RGB Mel/Delta/PCEN image for YOLO.
+
+    Red:
+        Power Mel spectrogram in dB.
+
+    Green:
+        Delta of the Power Mel spectrogram in dB.
+
+    Blue:
+        PCEN Mel spectrogram.
+
+    Output:
+        uint8 array with shape (image_size, image_size, 3).
+    """
+
+    # --------------------------------------------------------
+    # 1. Audio preparation
+    # --------------------------------------------------------
+
+    y = np.asarray(y, dtype=np.float32)
+
+    if y.ndim != 1:
+        raise ValueError(
+            "Expected mono audio with shape (samples,)."
+        )
+
+    if len(y) == 0:
+        raise ValueError("Audio input is empty.")
+
+    # Shared time resolution
+    hop_length = max(1, len(y) // image_size)
+
+    # --------------------------------------------------------
+    # 2. STFT
+    # --------------------------------------------------------
+
+    magnitude = np.abs(
+        stft_complex(y, N_FFT, hop_length)
+    ).astype(np.float32)
+
+    # --------------------------------------------------------
+    # 3. Mel filterbank
+    # --------------------------------------------------------
+
+    fb = mel_filterbank(
+        sr=sr,
+        n_fft=N_FFT,
+        n_mels=N_MELS,
+        fmin=0.0,
+        fmax=sr / 2
+    )
+
+    # --------------------------------------------------------
+    # 4. RED: Power Mel Spectrogram (dB)
+    # --------------------------------------------------------
+
+    mel_power = fb @ (magnitude ** 2)
+
+    red = 10.0 * np.log10(
+        np.maximum(mel_power, 1e-10)
+    )
+
+    # --------------------------------------------------------
+    # 5. GREEN: Delta Mel Spectrogram
+    # --------------------------------------------------------
+
+    # First resample to the target time resolution.
+    red = resample_cols(red, image_size)
+
+    # Delta is calculated AFTER time resampling.
+    green = compute_delta(
+        red,
+        width=DELTA_WIDTH
+    )
+
+    # --------------------------------------------------------
+    # 6. BLUE: PCEN Mel Spectrogram
+    # --------------------------------------------------------
+
+    mel_magnitude = fb @ magnitude
+
+    blue = compute_pcen(
+        mel_magnitude,
+        sr,
+        hop_length
+    )
+
+    blue = resample_cols(blue, image_size)
+
+    # --------------------------------------------------------
+    # 7. Resize frequency axis to image_size
+    # --------------------------------------------------------
+
+    def resize_frequency(x):
+
+        return zoom(
+            x,
+            (image_size / x.shape[0], 1),
+            order=1
+        )[:image_size, :]
+
+    red = resize_frequency(red)
+    green = resize_frequency(green)
+    blue = resize_frequency(blue)
+
+    # --------------------------------------------------------
+    # 8. Normalize individual channels
+    # --------------------------------------------------------
+
+    red = normalize_uint8(red)
+    green = normalize_uint8(green)
+    blue = normalize_uint8(blue)
+
+    # --------------------------------------------------------
+    # 9. Assemble RGB image
+    # --------------------------------------------------------
+
+    image = np.dstack([
+        red,
+        green,
+        blue
+    ])
+
+    return image.astype(np.uint8)
+
+
+
+''' Old SpectroDynamics
 def resize(input, image_size=(800, 800)):
     """Resize spectrogram to match model input size."""
     target_h, target_w = image_size
@@ -330,7 +673,7 @@ def generate_input_image(y, sr, image_size):
 
     return np.dstack([to_uint8(spec0), to_uint8(spec1), to_uint8(spec2)])
 
-
+'''
 def waveform_to_logmel(
     waveform,
     sr=48000,
@@ -1149,4 +1492,4 @@ if __name__ == "__main__":
         emb_dim=192,
         denoise=Denoise,
         classify=Classify,
-    )
+    )
