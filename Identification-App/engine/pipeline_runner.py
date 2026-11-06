@@ -9,16 +9,17 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from HYRAX_ID_predict import run_pipeline, SPEAKER_LIST, SR, collect_wav_files  # noqa: F401  (re-exported)
+from hyrax_id.audio_io import collect_wav_files
+from hyrax_id.config import DetectorImageConfig, SPEAKER_LIST, SR  # noqa: F401  (re-exported)
+from hyrax_id.pipeline import run_pipeline
 
-# Calibration constants, matching HYRAX_ID_predict.py's own __main__ defaults.
-# These are tied to the trained detector/classifier checkpoints -- change
-# only if you know why.
+# Calibration constants. These are tied to the trained detector/classifier checkpoints --
+# change only if you know why.
+#
+# The detector's image geometry (window length, image size, imgsz) is NOT a free parameter any more:
+# it comes from a DetectorImageConfig, which must match how the detector's training images were made
+# (MELDELTAPCEN.json). Pass `img_cfg=` to run_batch() to use something other than the default.
 DEFAULT_PARAMS = dict(
-    window_size=48000,
-    hop_size=24000,
-    image_size=800,
-    isMulti=True,
     interarrival_threshold=0.724,
     detector_threshold=0.30,
     context_windowsize=5,
@@ -28,7 +29,14 @@ DEFAULT_PARAMS = dict(
     Denoiser_num_worker=0,
     input_dim=64,
     emb_dim=192,
+    detector_iou=0.7,
+    detector_batch_size=16,
 )
+DEFAULT_WINDOW_OVERLAP = 0.5        # fraction of the 5 s detector window shared by consecutive windows
+
+# Old-pipeline settings that no longer exist. Callers (e.g. a GUI that still sends them) get a warning
+# instead of a crash, and the value is ignored.
+_REMOVED_PARAMS = ("window_size", "hop_size", "image_size", "isMulti")
 
 
 def list_input_stems(audio_path):
@@ -123,6 +131,10 @@ def run_batch(
     debug_denoised_dir=None,
     denoise=True,
     classify=True,
+    img_cfg=None,
+    window_overlap=DEFAULT_WINDOW_OVERLAP,
+    debug_image_dir=None,
+    debug_max_images=50,
     **param_overrides,
 ):
     """
@@ -136,11 +148,25 @@ def run_batch(
     run_pipeline() itself only knows how to scan a folder; a single file is
     staged into a temporary folder-of-one and cleaned up afterwards, so no
     pipeline logic is duplicated or forked.
+
+    img_cfg: DetectorImageConfig describing the detector's training images (default = MELDELTAPCEN.json
+    values: 48 kHz, 5 s windows, 980x980). window_overlap: 0..<1, fraction of overlap between windows.
+    debug_image_dir: if set, the first `debug_max_images` detector input images are saved there.
     """
     if denoise and not denoiser_model_path:
         raise ValueError("Denoising is enabled but no denoiser model path was given.")
     if classify and not animal_classifier_model_path:
         raise ValueError("Classification is enabled but no animal classifier model path was given.")
+
+    for name in _REMOVED_PARAMS:
+        if name in param_overrides:
+            print(f"[WARN] run_batch: '{name}' is no longer a setting and is ignored "
+                  f"(window/image geometry now comes from img_cfg).")
+            param_overrides.pop(name)
+    if not 0 <= window_overlap < 1:
+        raise ValueError("window_overlap must be at least 0 and below 1.")
+    img_cfg = img_cfg or DetectorImageConfig()
+    hop_samples = max(1, int(round(img_cfg.window_samples * (1 - window_overlap))))
 
     params = {**DEFAULT_PARAMS, **param_overrides}
     audio_path = Path(audio_path)
@@ -165,6 +191,10 @@ def run_batch(
             output_path=str(output_path),
             num_classes=len(SPEAKER_LIST),
             debug_denoised_dir=debug_denoised_dir,
+            debug_image_dir=debug_image_dir,
+            debug_max_images=debug_max_images,
+            img_cfg=img_cfg,
+            hop_samples=hop_samples,
             device_override=device_override,
             cancel_event=cancel_event,
             denoise=denoise,
