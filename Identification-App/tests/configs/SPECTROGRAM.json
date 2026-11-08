@@ -1,0 +1,123 @@
+{
+  "version": 1,
+  "audio_image": {
+    "image": {
+      "sample_rate": 48000,
+      "window_samples": 240000,
+      "width": 980,
+      "height": 980
+    },
+    "channels": [
+      {
+        "representation": "linear_spec",
+        "params": {
+          "n_fft": 1024,
+          "window": "hann",
+          "power": true,
+          "log": true,
+          "variant": "none",
+          "fmin": 0.0,
+          "fmax": 0.0
+        },
+        "norm": null,
+        "norm_lo": 1.0,
+        "norm_hi": 99.0
+      },
+      {
+        "representation": "linear_spec",
+        "params": {
+          "n_fft": 1024,
+          "window": "hann",
+          "power": true,
+          "log": true,
+          "variant": "none",
+          "fmin": 0.0,
+          "fmax": 0.0
+        },
+        "norm": null,
+        "norm_lo": 1.0,
+        "norm_hi": 99.0
+      },
+      {
+        "representation": "linear_spec",
+        "params": {
+          "n_fft": 1024,
+          "window": "hann",
+          "power": true,
+          "log": true,
+          "variant": "none",
+          "fmin": 0.0,
+          "fmax": 0.0
+        },
+        "norm": null,
+        "norm_lo": 1.0,
+        "norm_hi": 99.0
+      }
+    ]
+  },
+  "dataset": {
+    "recordings_dir": "D:/Hyrax-Detect/Base/ANIMAL-CLEAN",
+    "annotations_dir": "D:/Hyrax-Detect/Base/Ground_Truths_no_Bout",
+    "label_format": "audacity",
+    "recursive": true,
+    "columns": {},
+    "binary": false,
+    "binary_name": "target",
+    "class_map": {
+      "chuck": "chuck",
+      "wail": "wail",
+      "snort": "snort"
+    },
+    "class_order": [
+      "chuck",
+      "wail",
+      "snort"
+    ],
+    "min_visible_percent": 30.0,
+    "empty_percent": 10.0,
+    "split": [
+      70,
+      15,
+      15
+    ],
+    "split_strategy": "stratified",
+    "box_mode": "time",
+    "ref_channel": 1,
+    "seed": 556563,
+    "workers": 8,
+    "output_dir": "D:/Hyrax-Detect/DATASETS/Grayscale/SPECTROGRAM"
+  },
+  "train": {
+    "dataset_yaml": "D:\\Hyrax-Detect\\DATASETS\\Grayscale\\SPECTROGRAM\\dataset.yaml",
+    "project_dir": "D:/Hyrax-Detect/MODELS/GRAYSCALE_ACA",
+    "run_name": "SPECTROGRAM",
+    "model": "yolo26n.pt",
+    "resume": false,
+    "resume_checkpoint": "",
+    "imgsz_auto": true,
+    "imgsz": 640,
+    "epochs": 300,
+    "batch": 4,
+    "device": "",
+    "workers": 0,
+    "patience": 10,
+    "optimizer": "auto",
+    "lr0": 0.01,
+    "seed": 5464675,
+    "extra_args": ""
+  },
+  "inference": {
+    "model_path": "",
+    "input_dir": "",
+    "output_dir": "",
+    "recursive": true,
+    "output_format": "audacity",
+    "overlap_percent": 50.0,
+    "merge_strategy": "none",
+    "conf": 0.25,
+    "iou": 0.7,
+    "batch_size": 16,
+    "device": "",
+    "workers": 8
+  }
+}

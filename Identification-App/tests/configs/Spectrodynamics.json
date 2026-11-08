@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "audio_image": {
+    "image": {
+      "sample_rate": 48000,
+      "window_samples": 240000,
+      "width": 980,
+      "height": 980
+    },
+    "channels": [
+      {
+        "representation": "linear_spec",
+        "params": {
+          "n_fft": 1024,
+          "window": "hann",
+          "power": true,
+          "log": true,
+          "variant": "none",
+          "fmin": 0.0,
+          "fmax": 0.0
+        },
+        "norm": null,
+        "norm_lo": 1.0,
+        "norm_hi": 99.0
+      },
+      {
+        "representation": "linear_spec",
+        "params": {
+          "n_fft": 1024,
+          "window": "hann",
+          "power": true,
+          "log": true,
+          "variant": "delta",
+          "fmin": 0.0,
+          "fmax": 0.0
+        },
+        "norm": null,
+        "norm_lo": 1.0,
+        "norm_hi": 99.0
+      },
+      {
+        "representation": "linear_spec",
+        "params": {
+          "n_fft": 1024,
+          "window": "hann",
+          "power": true,
+          "log": true,
+          "variant": "delta-delta",
+          "fmin": 0.0,
+          "fmax": 0.0
+        },
+        "norm": null,
+        "norm_lo": 1.0,
+        "norm_hi": 99.0
+      }
+    ]
+  },
+  "dataset": {
+    "recordings_dir": "D:/Hyrax-Detect/Base/ANIMAL-CLEAN",
+    "annotations_dir": "D:/Hyrax-Detect/Base/Ground_Truths_no_Bout",
+    "label_format": "audacity",
+    "recursive": true,
+    "columns": {},
+    "binary": false,
+    "binary_name": "target",
+    "class_map": {
+      "chuck": "chuck",
+      "wail": "wail",
+      "snort": "snort"
+    },
+    "class_order": [
+      "chuck",
+      "wail",
+      "snort"
+    ],
+    "min_visible_percent": 30.0,
+    "empty_percent": 10.0,
+    "split": [
+      70,
+      15,
+      15
+    ],
+    "split_strategy": "by_recording",
+    "box_mode": "time",
+    "ref_channel": 0,
+    "seed": 473424,
+    "workers": 8,
+    "output_dir": "D:/Hyrax-Detect/DATASETS/Spectrodynamics"
+  },
+  "train": {
+    "dataset_yaml": "D:\\Hyrax-Detect\\DATASETS\\Spectrodynamics\\dataset.yaml",
+    "project_dir": "D:/Hyrax-Detect/MODELS/ACA_Spectrodynamics",
+    "run_name": "Spectrodynamics",
+    "model": "yolo26n.pt",
+    "resume": false,
+    "resume_checkpoint": "",
+    "imgsz_auto": true,
+    "imgsz": 640,
+    "epochs": 100,
+    "batch": 4,
+    "device": "",
+    "workers": 0,
+    "patience": 10,
+    "optimizer": "auto",
+    "lr0": 0.01,
+    "seed": 4789234,
+    "extra_args": ""
+  }
+}

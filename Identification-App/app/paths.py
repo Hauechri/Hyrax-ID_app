@@ -18,6 +18,8 @@ ENGINE_DIR = os.path.join(APP_DIR, "engine")
 MODELS_DIR = os.path.join(APP_DIR, "models")
 
 DETECTOR_MODEL_PATH = os.path.join(MODELS_DIR, "detector", "best.pt")
+# Settings file of the YOLO app that trained the detector (how its input images are made).
+PREPROCESS_CFG_PATH = os.path.join(MODELS_DIR, "detector", "animalspot_config.json")
 GARBAGE_FILTER_MODEL_PATH = os.path.join(MODELS_DIR, "boost", "XGBRich.joblib")
 ANIMAL_CLASSIFIER_MODEL_PATH = os.path.join(MODELS_DIR, "ecapa_tdnn", "best_model.pt")
 DENOISER_ACA_MODEL_PATH = os.path.join(MODELS_DIR, "animal-clean", "01_ACS.pk")

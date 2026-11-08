@@ -8,9 +8,13 @@ log is the primary "what's happening, and what did it find" surface.
 All four models (including the denoiser) are selected as file paths by the
 user -- there is no online download step. The denoiser and the animal
 classifier are optional: each has a checkbox, and its model path is only
-required (and only used) while that box is ticked. Advanced pipeline parameters
-(window/hop size, thresholds, etc.) are exposed as editable fields, and the
-whole left-hand configuration can be saved to / loaded from a .cfg file.
+required (and only used) while that box is ticked. The detector comes with the
+settings file of the YOLO app that trained it (the "preprocessing config"): it
+defines how the audio is turned into the detector's input images, so any detector
+the YOLO app can train works here by choosing its best.pt + that file. Advanced
+pipeline parameters (thresholds, window overlap, etc.) are exposed as editable
+fields, and the whole left-hand configuration can be saved to / loaded from a
+.cfg file.
 """
 import configparser
 import os
@@ -43,6 +47,7 @@ from PySide6.QtWidgets import (
 )
 
 import paths
+from hyrax_id.preprocess import PreprocessConfig, PreprocessConfigError, find_settings_for_weights
 from results_model import COLUMNS, ResultsModel
 from worker import InferenceWorker
 
@@ -53,10 +58,9 @@ from worker import InferenceWorker
 #   float  -> QDoubleSpinBox
 #   bool   -> QCheckBox
 ADVANCED_PARAM_SPECS = [
-    ("window_size", "int", 48000, dict(minimum=1, maximum=10_000_000)),
-    ("hop_size", "int", 24000, dict(minimum=1, maximum=10_000_000)),
-    ("image_size", "int", 800, dict(minimum=1, maximum=100_000)),
-    ("isMulti", "bool", True, {}),
+    # Window length / image size / channels come from the preprocessing config, not from here.
+    ("window_overlap_percent", "float", 50.0, dict(minimum=0.0, maximum=99.0, decimals=1, singleStep=5.0)),
+    ("detector_peak_normalize", "bool", True, {}),
     ("interarrival_threshold", "float", 0.724, dict(minimum=0.0, maximum=1000.0, decimals=3, singleStep=0.01)),
     ("detector_threshold", "float", 0.330, dict(minimum=0.0, maximum=1.0, decimals=3, singleStep=0.01)),
     ("context_windowsize", "int", 5, dict(minimum=0, maximum=100_000)),
@@ -149,7 +153,7 @@ class MainWindow(QMainWindow):
         layout.addLayout(button_row)
 
         self.slice_progress_bar = QProgressBar()
-        self.slice_progress_bar.setFormat("Slice %v/%m")
+        self.slice_progress_bar.setFormat("Window %v/%m")
         self.slice_progress_bar.setVisible(False)
         layout.addWidget(self.slice_progress_bar)
 
@@ -200,6 +204,7 @@ class MainWindow(QMainWindow):
         section["input_path"] = self.input_path_edit.text()
         section["output_path"] = self.output_path_edit.text()
         section["device"] = self.device_combo.currentData()
+        section["preprocess_cfg_path"] = self.preprocess_edit.text()
 
         for prefix, _label, _default in MODEL_PATH_FIELDS:
             section[f"{prefix}_model_path"] = self._model_path_edits[prefix].text()
@@ -257,6 +262,9 @@ class MainWindow(QMainWindow):
             value = section.get(f"{prefix}_model_path")
             if value is not None:
                 self._model_path_edits[prefix].setText(value)
+        # Older .cfg files have no preprocess_cfg_path: keep whatever is there (or found next to the weights).
+        if "preprocess_cfg_path" in section:
+            self.preprocess_edit.setText(section.get("preprocess_cfg_path", ""))
 
         # Older .cfg files have no denoise/classify keys: leave those boxes as they are.
         for stage_key, checkbox in self._stage_checkboxes.items():
@@ -355,13 +363,17 @@ class MainWindow(QMainWindow):
             edit = QLineEdit()
             edit.setText(default)
             browse_button = QPushButton("Browse...")
-            browse_button.clicked.connect(lambda _checked=False, e=edit: self._browse_model_path(e))
+            handler = self._browse_detector_path if prefix == "detector" else self._browse_model_path
+            browse_button.clicked.connect(lambda _checked=False, e=edit, h=handler: h(e))
             row.addWidget(edit)
             row.addWidget(browse_button)
             layout.addLayout(row)
 
             self._model_path_edits[prefix] = edit
             self._model_browse_buttons[prefix] = browse_button
+
+            if prefix == "detector":
+                self._build_preprocess_row(layout)
 
         return group
 
@@ -386,6 +398,88 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(self, "Select model file")
         if path:
             line_edit.setText(path)
+
+    # -- preprocessing config (the YOLO app's settings file) ------------------
+
+    def _build_preprocess_row(self, layout):
+        layout.addWidget(QLabel("Preprocessing config (YOLO app settings, .json)"))
+        row = QHBoxLayout()
+        self.preprocess_edit = QLineEdit()
+        self.preprocess_edit.setText(self._default_preprocess_path())
+        browse_button = QPushButton("Browse...")
+        browse_button.clicked.connect(self._browse_preprocess)
+        row.addWidget(self.preprocess_edit)
+        row.addWidget(browse_button)
+        layout.addLayout(row)
+
+        self.preprocess_summary = QLabel()
+        self.preprocess_summary.setWordWrap(True)
+        layout.addWidget(self.preprocess_summary)
+
+        self.preprocess_edit.textChanged.connect(self._refresh_preprocess_summary)
+        self._model_path_edits["detector"].textChanged.connect(self._refresh_preprocess_summary)
+        self._refresh_preprocess_summary()
+
+    @staticmethod
+    def _default_preprocess_path():
+        """The bundled config if there is one, else one next to the default weights, else empty."""
+        if os.path.isfile(paths.PREPROCESS_CFG_PATH):
+            return paths.PREPROCESS_CFG_PATH
+        found = find_settings_for_weights(paths.DETECTOR_MODEL_PATH)
+        return str(found) if found else ""
+
+    def _refresh_preprocess_summary(self, _text=None):
+        """Show what the chosen config means (or why it can't be used) right under the field."""
+        path = self.preprocess_edit.text().strip()
+        ok_style, bad_style = "color: #9a9a9a; font-size: 9pt;", "color: #d9534f; font-size: 9pt;"
+        if not path:
+            weights = self._model_path_edits["detector"].text().strip()
+            if find_settings_for_weights(weights):
+                self.preprocess_summary.setStyleSheet(ok_style)
+                self.preprocess_summary.setText("Empty: the settings file next to the detector weights will be used.")
+            else:
+                self.preprocess_summary.setStyleSheet(bad_style)
+                self.preprocess_summary.setText("No config chosen -- select the settings file of the YOLO app.")
+            return
+        try:
+            cfg = PreprocessConfig.from_file(path)
+        except PreprocessConfigError as exc:
+            self.preprocess_summary.setStyleSheet(bad_style)
+            self.preprocess_summary.setText(str(exc))
+            return
+        self.preprocess_summary.setStyleSheet(ok_style)
+        self.preprocess_summary.setText(cfg.describe())
+
+    def _apply_overlap_default(self, cfg_path):
+        """A config that carries its own inference overlap sets the overlap field (still editable)."""
+        try:
+            cfg = PreprocessConfig.from_file(cfg_path)
+        except PreprocessConfigError:
+            return
+        widget = self._advanced_widgets.get("window_overlap_percent")
+        if widget is not None and cfg.overlap_percent is not None:
+            widget.setValue(float(cfg.overlap_percent))
+
+    def _browse_preprocess(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Select the YOLO app settings file", self.preprocess_edit.text().strip(), "Settings (*.json);;All files (*)"
+        )
+        if path:
+            self.preprocess_edit.setText(path)
+            self._apply_overlap_default(path)
+
+    def _browse_detector_path(self, line_edit):
+        """Choosing new weights also picks up the settings file saved next to them (the YOLO app stores
+        animalspot_config.json in the run folder), so weights and preprocessing stay a matching pair."""
+        path, _ = QFileDialog.getOpenFileName(self, "Select detector weights", "", "YOLO weights (*.pt);;All files (*)")
+        if not path:
+            return
+        line_edit.setText(path)
+        found = find_settings_for_weights(path)
+        if found:
+            self.preprocess_edit.setText(str(found))
+            self._apply_overlap_default(found)
+            self.status_label.setText(f"Using the preprocessing config found next to the weights: {found}")
 
     def _build_device_group(self):
         group = QGroupBox("Device")
@@ -519,6 +613,23 @@ class MainWindow(QMainWindow):
             )
             return
 
+        detector_path = self._model_path_edits["detector"].text().strip()
+        preprocess_path = self.preprocess_edit.text().strip()
+        if not preprocess_path and not find_settings_for_weights(detector_path):
+            QMessageBox.warning(
+                self,
+                "Missing preprocessing config",
+                "Please choose the settings file of the YOLO app that trained the detector. It defines how "
+                "the audio is turned into the detector's input images.",
+            )
+            return
+        if preprocess_path:
+            try:
+                PreprocessConfig.from_file(preprocess_path)
+            except PreprocessConfigError as exc:
+                QMessageBox.warning(self, "Preprocessing config problem", str(exc))
+                return
+
         self._start_inference()
 
     def _start_inference(self):
@@ -552,6 +663,7 @@ class MainWindow(QMainWindow):
             audio_path=input_path,
             output_path=output_path,
             detector_model_path=self._model_path_edits["detector"].text().strip(),
+            preprocess_cfg_path=self.preprocess_edit.text().strip() or None,
             garbage_filter_model_path=self._model_path_edits["garbage_filter"].text().strip(),
             animal_classifier_model_path=(
                 self._model_path_edits["animal_classifier"].text().strip() if classify else None
@@ -580,7 +692,7 @@ class MainWindow(QMainWindow):
     def _on_slice_progress(self, current, total):
         self.slice_progress_bar.setRange(0, total)
         self.slice_progress_bar.setValue(current)
-        if current == 1:
+        if current == 0:
             # A new file's detector pass just started -- time it from here
             # rather than from the whole run's start, since denoising and
             # model loading time isn't representative of the per-slice rate.

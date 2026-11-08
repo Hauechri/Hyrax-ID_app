@@ -10,15 +10,16 @@ import tempfile
 from pathlib import Path
 
 from hyrax_id.audio_io import collect_wav_files
-from hyrax_id.config import DetectorImageConfig, SPEAKER_LIST, SR  # noqa: F401  (re-exported)
+from hyrax_id.config import SPEAKER_LIST, SR  # noqa: F401  (re-exported)
 from hyrax_id.pipeline import run_pipeline
+from hyrax_id.preprocess import PreprocessConfig, PreprocessConfigError, find_settings_for_weights
 
-# Calibration constants. These are tied to the trained detector/classifier checkpoints --
+# Calibration constants. These are tied to the trained garbage-filter/classifier checkpoints --
 # change only if you know why.
 #
-# The detector's image geometry (window length, image size, imgsz) is NOT a free parameter any more:
-# it comes from a DetectorImageConfig, which must match how the detector's training images were made
-# (MELDELTAPCEN.json). Pass `img_cfg=` to run_batch() to use something other than the default.
+# The detector's image geometry (window length, image size, channels, imgsz) is NOT a parameter here:
+# it comes from the YOLO app's settings file (see hyrax_id/preprocess.py), so swapping the detector
+# means swapping best.pt + its settings file, nothing else.
 DEFAULT_PARAMS = dict(
     interarrival_threshold=0.724,
     detector_threshold=0.30,
@@ -29,14 +30,26 @@ DEFAULT_PARAMS = dict(
     Denoiser_num_worker=0,
     input_dim=64,
     emb_dim=192,
-    detector_iou=0.7,
+    detector_iou=None,          # None -> the settings file's value, else 0.7
     detector_batch_size=16,
 )
-DEFAULT_WINDOW_OVERLAP = 0.5        # fraction of the 5 s detector window shared by consecutive windows
 
-# Old-pipeline settings that no longer exist. Callers (e.g. a GUI that still sends them) get a warning
+# Old-pipeline settings that no longer exist. Callers (e.g. an old .cfg / GUI) get a warning
 # instead of a crash, and the value is ignored.
 _REMOVED_PARAMS = ("window_size", "hop_size", "image_size", "isMulti")
+
+
+def resolve_preprocess(preprocess_cfg_path, detector_model_path) -> PreprocessConfig:
+    """Load the preprocessing config. No explicit path -> the settings file stored next to the weights
+    (animalspot_config.json, as saved by the YOLO app). Raises PreprocessConfigError with a clear message."""
+    path = preprocess_cfg_path or find_settings_for_weights(detector_model_path)
+    if not path:
+        raise PreprocessConfigError(
+            "No preprocessing config given and none found next to the detector weights. Choose the settings "
+            "file of the YOLO app that trained the detector (animalspot_config.json or a 'Save settings' export).")
+    cfg = PreprocessConfig.from_file(path)
+    print(f"[INFO] Preprocessing config: {path}")
+    return cfg
 
 
 def list_input_stems(audio_path):
@@ -131,8 +144,10 @@ def run_batch(
     debug_denoised_dir=None,
     denoise=True,
     classify=True,
-    img_cfg=None,
-    window_overlap=DEFAULT_WINDOW_OVERLAP,
+    preprocess_cfg_path=None,
+    preprocess=None,
+    window_overlap_percent=None,
+    detector_peak_normalize=True,
     debug_image_dir=None,
     debug_max_images=50,
     **param_overrides,
@@ -149,9 +164,11 @@ def run_batch(
     staged into a temporary folder-of-one and cleaned up afterwards, so no
     pipeline logic is duplicated or forked.
 
-    img_cfg: DetectorImageConfig describing the detector's training images (default = MELDELTAPCEN.json
-    values: 48 kHz, 5 s windows, 980x980). window_overlap: 0..<1, fraction of overlap between windows.
-    debug_image_dir: if set, the first `debug_max_images` detector input images are saved there.
+    preprocess_cfg_path: the YOLO app's settings file for the detector (animalspot_config.json or a "Save
+    settings" export). Omitted -> looked up next to detector_model_path. `preprocess` may be a ready
+    PreprocessConfig instead. window_overlap_percent: None -> the settings file's value, else 50.
+    detector_peak_normalize: see run_pipeline. debug_image_dir: if set, the first `debug_max_images`
+    detector input images are saved there.
     """
     if denoise and not denoiser_model_path:
         raise ValueError("Denoising is enabled but no denoiser model path was given.")
@@ -161,12 +178,12 @@ def run_batch(
     for name in _REMOVED_PARAMS:
         if name in param_overrides:
             print(f"[WARN] run_batch: '{name}' is no longer a setting and is ignored "
-                  f"(window/image geometry now comes from img_cfg).")
+                  f"(window/image geometry now comes from the preprocessing config).")
             param_overrides.pop(name)
-    if not 0 <= window_overlap < 1:
-        raise ValueError("window_overlap must be at least 0 and below 1.")
-    img_cfg = img_cfg or DetectorImageConfig()
-    hop_samples = max(1, int(round(img_cfg.window_samples * (1 - window_overlap))))
+    if preprocess is None:
+        preprocess = resolve_preprocess(preprocess_cfg_path, detector_model_path)
+    if window_overlap_percent is not None and not 0 <= window_overlap_percent < 100:
+        raise ValueError("window_overlap_percent must be at least 0 and below 100.")
 
     params = {**DEFAULT_PARAMS, **param_overrides}
     audio_path = Path(audio_path)
@@ -193,8 +210,9 @@ def run_batch(
             debug_denoised_dir=debug_denoised_dir,
             debug_image_dir=debug_image_dir,
             debug_max_images=debug_max_images,
-            img_cfg=img_cfg,
-            hop_samples=hop_samples,
+            preprocess=preprocess,
+            window_overlap_percent=window_overlap_percent,
+            detector_peak_normalize=detector_peak_normalize,
             device_override=device_override,
             cancel_event=cancel_event,
             denoise=denoise,

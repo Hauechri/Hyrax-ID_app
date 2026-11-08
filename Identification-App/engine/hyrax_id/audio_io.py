@@ -16,15 +16,24 @@ def collect_wav_files(folder_path):
     }
 
 
-def read_wave_file(filepath):
-    """Read a wave file and normalize the signal to [-1, 1] (used for detection input)."""
+def read_wave_file(filepath, peak_normalize=True):
+    """Read a wave file as mono float32 (used for detection input).
+    peak_normalize=True scales the peak to 1. False keeps the file's own level (integer files are
+    scaled to [-1, 1] by their bit depth, like the YOLO app's audio loader)."""
     rate, data = wav.read(filepath)
     if data.ndim > 1:
         data = data.mean(axis=1)  # Convert to mono
-    data = data.astype(np.float32)
-    peak = np.max(np.abs(data)) if data.size else 0.0
-    if peak > 0:
-        data /= peak
+    if peak_normalize:
+        data = data.astype(np.float32)
+        peak = np.max(np.abs(data)) if data.size else 0.0
+        if peak > 0:
+            data /= peak
+    elif data.dtype == np.uint8:
+        data = (data.astype(np.float32) - 128) / 128
+    elif np.issubdtype(data.dtype, np.integer):
+        data = data.astype(np.float32) / np.iinfo(data.dtype).max
+    else:
+        data = data.astype(np.float32)
     return data, rate
 
 

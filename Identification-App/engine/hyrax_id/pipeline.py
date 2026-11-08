@@ -12,12 +12,14 @@ import joblib
 import torch
 
 from .audio_io import collect_wav_files, read_wave_file, load_audio
-from .audio2image import DebugImageSaver
-from .config import DetectorImageConfig, SR
+from .config import SR
+from .debug import DebugImageSaver
 from .detection import detect_elements_for_file
 from .detector import YoloDetector
+from .garbage_filter import LABEL_MAP
 from .labels_io import save_full_audacity_labels
 from .postprocess import build_bout_data
+from .preprocess import PreprocessConfig
 
 
 @dataclass
@@ -36,7 +38,7 @@ def select_device(device_override=None) -> torch.device:
     return torch.device(device_override)
 
 
-def load_models(*, detector_path, garbage_path, classifier_path, denoiser_path, img_cfg, detector_threshold,
+def load_models(*, detector_path, garbage_path, classifier_path, denoiser_path, preprocess, detector_threshold,
                 detector_iou, detector_batch_size, debug_saver, num_classes, input_dim, emb_dim,
                 device, denoise, classify) -> Models:
     if denoise:
@@ -47,11 +49,18 @@ def load_models(*, detector_path, garbage_path, classifier_path, denoiser_path, 
         d_model = d_opts = None
         print("[INFO] Denoising disabled -- the detector will run on the original audio.")
 
-    detector = YoloDetector(detector_path, img_cfg, conf=detector_threshold, iou=detector_iou,
+    detector = YoloDetector(detector_path, preprocess, conf=detector_threshold, iou=detector_iou,
                             device=None if device.type == "cpu" else str(device),
                             batch_size=detector_batch_size, debug_saver=debug_saver)
-    print(f"[INFO] Detector loaded: {detector_path}  (classes: {detector.names}, imgsz={img_cfg.size}, "
-          f"window={img_cfg.window_s:.2f}s)")
+    print(f"[INFO] Detector loaded: {detector_path}")
+    print(f"[INFO] Classes: {detector.names}")
+    print(f"[INFO] Preprocessing: {preprocess.describe()}")
+    for warning in preprocess.check_model(detector.names.values(), detector.trained_imgsz):
+        print(f"[WARN] {warning}")
+    unknown = sorted(str(n) for n in detector.names.values() if str(n).lower() not in LABEL_MAP)
+    if unknown:
+        raise ValueError(f"The detector has class(es) {unknown} that the garbage filter does not know "
+                         f"(it handles {sorted(LABEL_MAP)}). This pipeline needs a detector with those classes.")
 
     gc_data = joblib.load(garbage_path)
     print(f"[INFO] GarbageCollector loaded: {garbage_path}")
@@ -70,14 +79,15 @@ def load_models(*, detector_path, garbage_path, classifier_path, denoiser_path, 
 
 
 def get_detector_signal(models: Models, path, denoise, denoiser_seq_len, denoiser_workers, device,
-                        debug_denoised_dir, stem):
-    """Returns (signal, sr) for the detector: denoised or original, peak-normalised mono float32."""
+                        debug_denoised_dir, stem, peak_normalize=True):
+    """Returns (signal, sr) for the detector: denoised or original, mono float32 (peak-normalised if asked)."""
     if denoise:
         from .denoiser import denoise_single_file
         debug_path = os.path.join(debug_denoised_dir, f"{stem}.wav") if debug_denoised_dir else None
         return denoise_single_file(models.denoiser, models.denoiser_opts, path, denoiser_seq_len,
-                                   denoiser_workers, device, debug_output_path=debug_path)
-    return read_wave_file(path)
+                                   denoiser_workers, device, debug_output_path=debug_path,
+                                   peak_normalize=peak_normalize)
+    return read_wave_file(path, peak_normalize=peak_normalize)
 
 
 def run_pipeline(
@@ -89,8 +99,7 @@ def run_pipeline(
     Denoiser_num_worker,
     audio_folder,
     output_path,
-    img_cfg: DetectorImageConfig,
-    hop_samples,
+    preprocess: PreprocessConfig,
     detector_threshold,
     interarrival_threshold,
     context_windowsize,
@@ -99,7 +108,8 @@ def run_pipeline(
     num_classes,
     input_dim=64,
     emb_dim=192,
-    detector_iou=0.7,
+    window_overlap_percent=None,
+    detector_iou=None,
     detector_batch_size=16,
     debug_denoised_dir=None,
     debug_image_dir=None,
@@ -108,11 +118,15 @@ def run_pipeline(
     cancel_event=None,
     denoise=True,
     classify=True,
+    detector_peak_normalize=True,
 ):
     """
-    img_cfg:       DetectorImageConfig -- the single source of truth for window length, image size and
-                   imgsz (replaces the old window_size / image_size arguments).
-    hop_samples:   window hop in samples at img_cfg.sample_rate (120000 = 50% overlap of 5 s windows).
+    preprocess:    PreprocessConfig loaded from the YOLO app's settings file -- the single source of truth for
+                   window length, image size, channels and imgsz.
+    window_overlap_percent: overlap of consecutive detector windows (None = the settings file's value, else 50).
+    detector_iou:  NMS IoU inside one window (None = the settings file's value, else 0.7).
+    detector_peak_normalize: scale the detector's audio to peak 1. Switch off for configs with a 'waveform'
+                   channel if the training audio was not peak-normalised (the waveform image depends on level).
     debug_image_dir: if set, the first `debug_max_images` detector input images are saved there.
     debug_denoised_dir: if set, every denoised file is also written there as wav.
     """
@@ -123,12 +137,22 @@ def run_pipeline(
 
     device = select_device(device_override)
     print(f"[INFO] Using device: {device}")
+    hop_samples = preprocess.hop_samples(window_overlap_percent)
+    overlap_used = 100.0 * (1 - hop_samples / preprocess.window_samples)
+    print(f"[INFO] Detector windows: {preprocess.window_s:g} s, hop {hop_samples / preprocess.sample_rate:g} s "
+          f"({overlap_used:.0f}% overlap)")
+    if detector_iou is None:
+        detector_iou = preprocess.iou if preprocess.iou is not None else 0.7
+    if preprocess.uses_absolute_amplitude and detector_peak_normalize:
+        print("[INFO] This preprocessing has a waveform channel, whose image depends on the signal level, and the "
+              "detector audio is peak-normalised. If detection is poor, try switching off "
+              "'detector_peak_normalize' (the YOLO app used the audio level as it is).")
 
     debug_saver = DebugImageSaver(debug_image_dir, debug_max_images) if debug_image_dir else None
     models = load_models(
         detector_path=Detector_model_path, garbage_path=GarbageFilter_model_path,
         classifier_path=Animal_Classifier_model_path, denoiser_path=Denoiser_model_path,
-        img_cfg=img_cfg, detector_threshold=detector_threshold, detector_iou=detector_iou,
+        preprocess=preprocess, detector_threshold=detector_threshold, detector_iou=detector_iou,
         detector_batch_size=detector_batch_size, debug_saver=debug_saver, num_classes=num_classes,
         input_dim=input_dim, emb_dim=emb_dim, device=device, denoise=denoise, classify=classify)
 
@@ -146,12 +170,13 @@ def run_pipeline(
         print(f"\n[FILE {file_index + 1}/{len(originals)}] Processing: {stem}")
 
         signal, signal_sr = get_detector_signal(models, original_path, denoise, Denoiser_sequence_length,
-                                                Denoiser_num_worker, device, debug_denoised_dir, stem)
+                                                Denoiser_num_worker, device, debug_denoised_dir, stem,
+                                                peak_normalize=detector_peak_normalize)
         if signal is None or signal.size == 0:
             print(f"  [WARN] {stem}: no audio to process (empty / too short), skipping.")
             continue
-        if signal_sr != img_cfg.sample_rate:
-            print(f"  [WARN] {stem}: sample rate {signal_sr} != {img_cfg.sample_rate}; resampling for the detector.")
+        if signal_sr != preprocess.sample_rate:
+            print(f"  [WARN] {stem}: sample rate {signal_sr} != {preprocess.sample_rate}; resampling for the detector.")
 
         elements, bouts = detect_elements_for_file(
             models.detector, models.garbagecollector, models.feature_keys, signal, signal_sr, hop_samples,

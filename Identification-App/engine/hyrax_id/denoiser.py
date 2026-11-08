@@ -50,11 +50,11 @@ def load_denoiser(model_path, device):
 
 
 def denoise_single_file(model, dataOpts, audio_path, sequence_len_seconds, num_workers,
-                         device, debug_output_path=None):
+                         device, debug_output_path=None, peak_normalize=True):
     """
     Denoises ONE audio file entirely in memory (no intermediate wav on disk
     for the pipeline to read back) and returns (signal, sr) ready to feed
-    straight into detect_elements_for_file -- i.e. peak-normalized float32
+    straight into detect_elements_for_file -- i.e. (by default peak-normalized) float32
     mono, matching exactly what read_wave_file used to hand the detector
     from a written-out wav.
 
@@ -162,12 +162,13 @@ def denoise_single_file(model, dataOpts, audio_path, sequence_len_seconds, num_w
         debug_int16 = (total_audio_np * np.iinfo(np.int16).max).astype(np.int16)
         wav.write(debug_output_path, sr, debug_int16)
 
-    # Match read_wave_file's normalization exactly (peak -> [-1, 1], mono)
-    # so detect_elements_for_file sees the same kind of input it always has.
+    # Mono; optionally peak-normalized exactly like read_wave_file (peak_normalize=False keeps the
+    # denoiser's own output level, which matters for amplitude-dependent channels such as 'waveform').
     if total_audio_np.ndim > 1:
         total_audio_np = total_audio_np.mean(axis=1)
-    peak = np.max(np.abs(total_audio_np))
-    if peak > 0:
-        total_audio_np = total_audio_np / peak
+    if peak_normalize:
+        peak = np.max(np.abs(total_audio_np))
+        if peak > 0:
+            total_audio_np = total_audio_np / peak
 
     return total_audio_np, sr
