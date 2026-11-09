@@ -1,7 +1,16 @@
 # How the app finds your recordings
 
-You point the app at two things: an **Annotation file** and an **Audio folder**.
-There is exactly **one rule** connecting them:
+You point the app at an **Audio folder** and, optionally, an **Annotation file**
+("Use annotation file" switch).
+
+**Without an annotation file**, calls are detected automatically from the
+audio, grouped into bouts by pauses, and the **animal** is the name of the
+sub-folder a `.wav` file sits in (`INPUT/MS/240701_0091.wav` → animal `MS`;
+files directly in the audio folder get animal `unknown`). Nothing else is
+needed — the rest of this page is about the annotation file.
+
+**With an annotation file**, there is exactly **one rule** connecting it to
+the audio:
 
 > The **"Song ID"** column in the Annotation file must equal the **filename**
 > of a `.wav` file in the Audio folder (without the `.wav` part).

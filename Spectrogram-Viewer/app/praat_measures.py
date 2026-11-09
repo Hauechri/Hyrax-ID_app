@@ -142,8 +142,11 @@ def f0_contour(sig, fs, t0, t1):
 def measure_f0(sig, fs, t0, t1, element=None):
     """F0 measurements for one element: hz_max / hz_min (band edges, see module doc) plus the
     mean / median of the tracked F0 contour. Values are nan when no voiced F0 is found."""
+    return _f0_from_track(_track(sig, fs, t0, t1), element)
+
+
+def _f0_from_track(tr, element):
     out = dict(hz_max=np.nan, hz_min=np.nan, f0_mean=np.nan, f0_median=np.nan)
-    tr = _track(sig, fs, t0, t1)
     if tr is None:
         return out
     _, fv, freqs, L, cols = tr
@@ -188,10 +191,30 @@ def measure_formants(sig, fs, t0, t1, ceiling_hz=FORMANT_CEILING_HZ):
 
 def formant_tracks(sig, fs, t0, t1, ceiling_hz=FORMANT_CEILING_HZ):
     """(times, [F1, F2, F3]) formant tracks over [t0, t1], for plotting (nan where undefined)."""
-    formant = _formant_object(sig, fs, t0, t1, ceiling_hz, 0.0)
+    return _tracks_from_formant(_formant_object(sig, fs, t0, t1, ceiling_hz, 0.0), t0, t1)
+
+
+def _tracks_from_formant(formant, t0, t1):
     if formant is None:
         return np.array([]), [np.array([])] * FORMANT_COUNT
     times = np.asarray(formant.xs())
+    times = times[(times >= t0) & (times <= t1)]
     tracks = [np.array([formant.get_value_at_time(k, t) for t in times], dtype=float)
               for k in range(1, FORMANT_COUNT + 1)]
     return times, tracks
+
+
+def analyse_element(sig, fs, t0, t1, element=None, ceiling_hz=FORMANT_CEILING_HZ):
+    """Everything for one element in one pass (one pitch analysis, one formant analysis):
+    (f0 measurements, {F1, F2, F3} means, (times, f0) track, (times, [F1, F2, F3]) tracks)."""
+    tr = _track(sig, fs, t0, t1)
+    f0 = _f0_from_track(tr, element)
+    f0_track = (tr[0], tr[1]) if tr is not None else (np.array([]), np.array([]))
+
+    fm = {f"F{k}": np.nan for k in range(1, FORMANT_COUNT + 1)}
+    formant = _formant_object(sig, fs, t0, t1, ceiling_hz, FORMANT_CONTEXT_S)
+    if formant is not None:
+        for k in range(1, FORMANT_COUNT + 1):
+            v = call(formant, "Get mean", k, t0, t1, "hertz")
+            fm[f"F{k}"] = float(v) if v == v else np.nan
+    return f0, fm, f0_track, _tracks_from_formant(formant, t0, t1)

@@ -1,5 +1,5 @@
 """
-Desktop prototype for the Acoustic Spectrogram Viewer.
+Desktop app for the Acoustic Spectrogram Viewer.
 
 Run with:
     .venv\\Scripts\\python.exe app\\main.py
@@ -13,15 +13,16 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
     QComboBox, QLabel, QPushButton, QDoubleSpinBox, QSpinBox, QCheckBox,
     QGroupBox, QFileDialog, QMessageBox, QStatusBar, QSplitter, QLineEdit,
-    QColorDialog, QScrollArea,
+    QColorDialog, QScrollArea, QTabWidget, QProgressBar, QPlainTextEdit,
 )
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QIcon
+from PySide6.QtCore import Qt, QObject, QThread, QUrl, Signal
+from PySide6.QtGui import QColor, QIcon, QDesktopServices
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from spectrogram_core import SpectrogramProject, RenderSettings, BoutNotFoundError, DEFAULT_ELEMENT_COLOR_MAP
+from call_detection import BOUT_GAP_S
 
 if "__compiled__" in globals():
     # Nuitka standalone build: the exe sits directly next to assets/ (see build_exe.ps1);
@@ -33,6 +34,7 @@ else:
     ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
 ICON_PATH = os.path.join(ASSETS_DIR, "icon.ico")
+ALL_ANIMALS = "All animals"
 
 
 class ColorButton(QPushButton):
@@ -65,20 +67,74 @@ class ColorButton(QPushButton):
         return self._hex
 
 
+class PathRow(QWidget):
+    """Read-only path field (shows the last path component, full path as tooltip) + Browse button."""
+
+    def __init__(self, path, browse, extra_button=None):
+        super().__init__()
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 0, 0)
+        self.edit = QLineEdit()
+        self.edit.setReadOnly(True)
+        self.button = QPushButton("Browse…")
+        self.button.clicked.connect(browse)
+        row.addWidget(self.edit, 1)
+        row.addWidget(self.button)
+        if extra_button is not None:
+            row.addWidget(extra_button)
+        self.set_path(path)
+
+    def set_path(self, path):
+        # Show just the last component — the full path only fits by scrolling
+        # to whichever end the cursor happens to be at, which reads as garbled.
+        self.edit.setText(os.path.basename(os.path.normpath(path)) or path)
+        self.edit.setToolTip(path)
+
+
+class BatchWorker(QObject):
+    progress = Signal(int, int, str)
+    finished = Signal(dict)
+    failed = Signal(str)
+
+    def __init__(self, project, recordings, settings, outputs):
+        super().__init__()
+        self.project, self.recordings, self.settings, self.outputs = project, recordings, settings, outputs
+        self._stop = False
+
+    def stop(self):
+        self._stop = True
+
+    def run(self):
+        try:
+            result = self.project.run_batch(
+                self.recordings, self.settings, **self.outputs,
+                progress=lambda done, total, msg: self.progress.emit(done, total, msg),
+                should_stop=lambda: self._stop,
+            )
+            result["cancelled"] = self._stop
+            self.finished.emit(result)
+        except Exception:
+            self.failed.emit(traceback.format_exc())
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Acoustic Spectrogram Viewer")
         if os.path.isfile(ICON_PATH):
             self.setWindowIcon(QIcon(ICON_PATH))
-        self.resize(1400, 850)
+        self.resize(1400, 900)
 
         self.status = QStatusBar()
         self.setStatusBar(self.status)
 
         self.project = None
+        self.last_render = None
+        self._batch_thread = None
+        self._batch_worker = None
         self.annotation_path = os.path.join(APP_DIR, "Songs analysed by Héloïse.xlsx")
         self.audio_dir_path = os.path.join(APP_DIR, "INPUT")
+        self.output_dir_path = os.path.join(APP_DIR, "OUTPUT")
 
         splitter = QSplitter(Qt.Horizontal)
         splitter.addWidget(self._build_controls())
@@ -87,51 +143,91 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(1, 1)
         self.setCentralWidget(splitter)
 
-        if os.path.isfile(self.annotation_path):
+        self.use_annotation_check.setChecked(os.path.isfile(self.annotation_path))
+        self._on_annotation_toggled(self.use_annotation_check.isChecked())
+        if os.path.isdir(self.audio_dir_path):
             self._load_project()
         else:
-            self.status.showMessage("Choose an annotation file and audio folder, then click Load library.")
+            self.status.showMessage("Choose an audio folder, then click Load library.")
 
     # ---------- UI construction ----------
 
     def _build_controls(self):
         panel = QWidget()
         layout = QVBoxLayout(panel)
+        layout.addWidget(self._build_data_box())
+        layout.addWidget(self._build_output_box())
 
-        # --- data source ---
-        source_box = QGroupBox("Data source")
-        sform = QVBoxLayout(source_box)
+        self.mode_tabs = QTabWidget()
+        self.mode_tabs.addTab(self._build_single_tab(), "Single recording")
+        self.mode_tabs.addTab(self._build_batch_tab(), "Batch (folder)")
+        layout.addWidget(self.mode_tabs)
 
-        self.annotation_edit = QLineEdit()
-        self.annotation_edit.setReadOnly(True)
-        self._set_path_display(self.annotation_edit, self.annotation_path)
-        ann_row = QHBoxLayout()
-        ann_row.addWidget(QLabel("Annotation file:"))
-        browse_ann_btn = QPushButton("Browse…")
-        browse_ann_btn.clicked.connect(self._browse_annotation_file)
-        ann_row.addWidget(browse_ann_btn)
-        sform.addLayout(ann_row)
-        sform.addWidget(self.annotation_edit)
+        layout.addWidget(self._build_measurement_box())
+        layout.addWidget(self._build_display_box())
+        layout.addWidget(self._build_legend_box())
+        layout.addWidget(self._build_image_box())
+        layout.addStretch(1)
 
-        self.audio_edit = QLineEdit()
-        self.audio_edit.setReadOnly(True)
-        self._set_path_display(self.audio_edit, self.audio_dir_path)
-        audio_row = QHBoxLayout()
-        audio_row.addWidget(QLabel("Audio folder:"))
-        browse_audio_btn = QPushButton("Browse…")
-        browse_audio_btn.clicked.connect(self._browse_audio_folder)
-        audio_row.addWidget(browse_audio_btn)
-        sform.addLayout(audio_row)
-        sform.addWidget(self.audio_edit)
+        # Scrollable wrapper: if the window's usable height is shorter than
+        # all the group boxes stacked at their natural size (e.g. maximized
+        # on a shorter display), scroll instead of squishing every row.
+        scroll = QScrollArea()
+        scroll.setWidget(panel)
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setMinimumWidth(420)
+        scroll.setMaximumWidth(540)
+        return scroll
+
+    def _build_data_box(self):
+        self.data_box = QGroupBox("1 · Data")
+        v = QVBoxLayout(self.data_box)
+
+        audio_label = QLabel("Audio folder (.wav files, any sub-folder layout):")
+        audio_label.setWordWrap(True)
+        v.addWidget(audio_label)
+        self.audio_row = PathRow(self.audio_dir_path, self._browse_audio_folder)
+        v.addWidget(self.audio_row)
+
+        self.use_annotation_check = QCheckBox("Use annotation file")
+        self.use_annotation_check.setToolTip(
+            "On: bouts, element times and reference HzMin / HzMax come from the Excel file.\n"
+            "Off: calls are detected automatically from the audio.")
+        self.use_annotation_check.toggled.connect(self._on_annotation_toggled)
+        v.addWidget(self.use_annotation_check)
+
+        self.annotation_row = PathRow(self.annotation_path, self._browse_annotation_file)
+        v.addWidget(self.annotation_row)
+
+        self.annotation_hint = QLabel()
+        self.annotation_hint.setWordWrap(True)
+        self.annotation_hint.setStyleSheet("color: gray;")
+        v.addWidget(self.annotation_hint)
 
         self.load_btn = QPushButton("Load library")
         self.load_btn.clicked.connect(self._load_project)
-        sform.addWidget(self.load_btn)
-        layout.addWidget(source_box)
+        v.addWidget(self.load_btn)
+        return self.data_box
 
-        # --- recording selection ---
-        selection_box = QGroupBox("Recording")
-        form = QFormLayout(selection_box)
+    def _build_output_box(self):
+        box = QGroupBox("2 · Output folder (images + CSV)")
+        v = QVBoxLayout(box)
+        open_btn = QPushButton("Open")
+        open_btn.setToolTip("Open the output folder in Explorer")
+        open_btn.clicked.connect(self._open_output_folder)
+        self.output_row = PathRow(self.output_dir_path, self._browse_output_folder, extra_button=open_btn)
+        v.addWidget(self.output_row)
+        hint = QLabel("Files go to <output>/<Animal>/<Recording>/, e.g. MS_240701_0091_bout_01.png")
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: gray;")
+        v.addWidget(hint)
+        return box
+
+    def _build_single_tab(self):
+        tab = QWidget()
+        v = QVBoxLayout(tab)
+        form = QFormLayout()
         self.animal_combo = QComboBox()
         self.recording_combo = QComboBox()
         self.bout_combo = QComboBox()
@@ -140,48 +236,120 @@ class MainWindow(QMainWindow):
         form.addRow("Animal", self.animal_combo)
         form.addRow("Recording", self.recording_combo)
         form.addRow("Bout", self.bout_combo)
-        layout.addWidget(selection_box)
+        v.addLayout(form)
 
-        # --- settings ---
-        settings_box = QGroupBox("Settings")
-        sform2 = QFormLayout(settings_box)
+        self.generate_btn = QPushButton("Generate spectrogram")
+        self.generate_btn.clicked.connect(self._on_generate)
+        v.addWidget(self.generate_btn)
 
-        self.padding_spin = QDoubleSpinBox()
-        self.padding_spin.setRange(0, 10)
-        self.padding_spin.setValue(1.0)
-        sform2.addRow("Padding (s)", self.padding_spin)
+        row = QHBoxLayout()
+        self.save_btn = QPushButton("Save image")
+        self.save_btn.clicked.connect(self._on_save)
+        self.export_csv_btn = QPushButton("Save CSV")
+        self.export_csv_btn.clicked.connect(self._on_export_csv)
+        for b in (self.save_btn, self.export_csv_btn):
+            b.setEnabled(False)
+            row.addWidget(b)
+        v.addLayout(row)
+        return tab
 
-        self.freq_min_spin = QSpinBox()
-        self.freq_min_spin.setRange(0, 20000)
-        self.freq_min_spin.setValue(200)
-        sform2.addRow("Freq min (Hz)", self.freq_min_spin)
+    def _build_batch_tab(self):
+        tab = QWidget()
+        v = QVBoxLayout(tab)
+        form = QFormLayout()
+        self.batch_animal_combo = QComboBox()
+        self.batch_animal_combo.currentTextChanged.connect(self._update_batch_summary)
+        form.addRow("Animal", self.batch_animal_combo)
+        v.addLayout(form)
 
-        self.freq_max_spin = QSpinBox()
-        self.freq_max_spin.setRange(100, 40000)
-        self.freq_max_spin.setValue(5000)
-        sform2.addRow("Freq max (Hz)", self.freq_max_spin)
+        self.batch_summary = QLabel("Load a library first.")
+        self.batch_summary.setStyleSheet("color: gray;")
+        v.addWidget(self.batch_summary)
 
-        self.fft_combo = QComboBox()
-        self.fft_combo.addItems(["512", "1024", "2048", "4096"])
-        self.fft_combo.setCurrentText("2048")
-        sform2.addRow("FFT size", self.fft_combo)
+        self.batch_png_check = QCheckBox("PNG image per bout")
+        self.batch_rec_csv_check = QCheckBox("CSV per recording")
+        self.batch_all_csv_check = QCheckBox("One combined CSV for the whole batch")
+        for c in (self.batch_png_check, self.batch_rec_csv_check, self.batch_all_csv_check):
+            c.setChecked(True)
+            v.addWidget(c)
 
-        self.color_combo = QComboBox()
-        self.color_combo.addItems(["grayscale", "classic", "inferno"])
-        sform2.addRow("Color scheme", self.color_combo)
+        row = QHBoxLayout()
+        self.batch_run_btn = QPushButton("Run batch")
+        self.batch_run_btn.clicked.connect(self._on_run_batch)
+        self.batch_cancel_btn = QPushButton("Cancel")
+        self.batch_cancel_btn.setEnabled(False)
+        self.batch_cancel_btn.clicked.connect(self._on_cancel_batch)
+        row.addWidget(self.batch_run_btn)
+        row.addWidget(self.batch_cancel_btn)
+        v.addLayout(row)
+
+        self.batch_progress = QProgressBar()
+        self.batch_progress.setValue(0)
+        v.addWidget(self.batch_progress)
+        self.batch_log = QPlainTextEdit()
+        self.batch_log.setReadOnly(True)
+        self.batch_log.setMaximumHeight(130)
+        v.addWidget(self.batch_log)
+        return tab
+
+    def _build_measurement_box(self):
+        box = QGroupBox("Measurement")
+        form = QFormLayout(box)
+
+        self.hz_source_combo = QComboBox()
+        self.hz_source_combo.addItem("Detected automatically", "auto")
+        self.hz_source_combo.addItem("Annotation file", "annotation")
+        self.hz_source_combo.currentIndexChanged.connect(self._update_measurement_controls)
+        form.addRow("HzMin / HzMax boxes", self.hz_source_combo)
+
+        self.show_annotation_check = QCheckBox("Outline annotated boxes (compare)")
+        self.show_annotation_check.setChecked(True)
+        form.addRow(self.show_annotation_check)
 
         self.formant_ceiling_spin = QSpinBox()
         self.formant_ceiling_spin.setRange(3000, 20000)
         self.formant_ceiling_spin.setSingleStep(500)
         self.formant_ceiling_spin.setValue(7500)
-        self.formant_ceiling_spin.setToolTip("Praat formant ceiling for the F1–F3 values in the CSV export.")
-        sform2.addRow("Formant ceiling (Hz)", self.formant_ceiling_spin)
+        self.formant_ceiling_spin.setSuffix(" Hz")
+        self.formant_ceiling_spin.setToolTip("Praat formant ceiling for F1–F3 (lines and CSV).")
+        form.addRow("Formant ceiling", self.formant_ceiling_spin)
+        return box
 
-        layout.addWidget(settings_box)
+    def _build_display_box(self):
+        box = QGroupBox("Display")
+        form = QFormLayout(box)
 
-        # --- legend colors ---
-        legend_box = QGroupBox("Legend colors")
-        lform = QFormLayout(legend_box)
+        self.padding_spin = QDoubleSpinBox()
+        self.padding_spin.setRange(0, 10)
+        self.padding_spin.setValue(1.0)
+        self.padding_spin.setSuffix(" s")
+        form.addRow("Padding", self.padding_spin)
+
+        self.freq_min_spin = QSpinBox()
+        self.freq_min_spin.setRange(0, 20000)
+        self.freq_min_spin.setValue(200)
+        self.freq_min_spin.setSuffix(" Hz")
+        form.addRow("Freq min", self.freq_min_spin)
+
+        self.freq_max_spin = QSpinBox()
+        self.freq_max_spin.setRange(100, 40000)
+        self.freq_max_spin.setValue(5000)
+        self.freq_max_spin.setSuffix(" Hz")
+        form.addRow("Freq max", self.freq_max_spin)
+
+        self.fft_combo = QComboBox()
+        self.fft_combo.addItems(["512", "1024", "2048", "4096"])
+        self.fft_combo.setCurrentText("2048")
+        form.addRow("FFT size", self.fft_combo)
+
+        self.color_combo = QComboBox()
+        self.color_combo.addItems(["grayscale", "classic", "inferno"])
+        form.addRow("Color scheme", self.color_combo)
+        return box
+
+    def _build_legend_box(self):
+        box = QGroupBox("Lines && colors")
+        lform = QFormLayout(box)
 
         self.show_f0_check = QCheckBox("F0 (pitch)")
         self.show_f0_check.setChecked(True)
@@ -202,68 +370,32 @@ class MainWindow(QMainWindow):
         self.show_boxes_check.setChecked(True)
         lform.addRow(self.show_boxes_check)
 
-        self.hz_source_combo = QComboBox()
-        self.hz_source_combo.addItem("Detected automatically", "auto")
-        self.hz_source_combo.addItem("Annotation file", "annotation")
-        self.hz_source_combo.currentIndexChanged.connect(
-            lambda _: self.show_annotation_check.setEnabled(self.hz_source_combo.currentData() == "auto"))
-        lform.addRow("HzMin / HzMax from", self.hz_source_combo)
-
-        self.show_annotation_check = QCheckBox("Outline annotated boxes (compare)")
-        self.show_annotation_check.setChecked(True)
-        lform.addRow(self.show_annotation_check)
-
         self.element_color_btns = {}
         for elem, default_hex in DEFAULT_ELEMENT_COLOR_MAP.items():
             btn = ColorButton(default_hex)
             self.element_color_btns[elem] = btn
-            lform.addRow(QLabel(elem), btn)
+            label = "Call (detected)" if elem == "Call" else elem
+            lform.addRow(QLabel(label), btn)
+        return box
 
-        layout.addWidget(legend_box)
-
-        # --- export ---
-        export_box = QGroupBox("Export")
-        eform = QFormLayout(export_box)
+    def _build_image_box(self):
+        box = QGroupBox("Image size")
+        eform = QFormLayout(box)
         self.export_width_spin = QDoubleSpinBox()
         self.export_width_spin.setRange(2, 40)
         self.export_width_spin.setValue(14)
-        eform.addRow("Width (in)", self.export_width_spin)
+        self.export_width_spin.setSuffix(" in")
+        eform.addRow("Width", self.export_width_spin)
         self.export_height_spin = QDoubleSpinBox()
         self.export_height_spin.setRange(2, 40)
         self.export_height_spin.setValue(6)
-        eform.addRow("Height (in)", self.export_height_spin)
+        self.export_height_spin.setSuffix(" in")
+        eform.addRow("Height", self.export_height_spin)
         self.dpi_spin = QSpinBox()
         self.dpi_spin.setRange(72, 600)
         self.dpi_spin.setValue(150)
         eform.addRow("DPI", self.dpi_spin)
-        layout.addWidget(export_box)
-
-        self.generate_btn = QPushButton("Generate spectrogram")
-        self.generate_btn.clicked.connect(self._on_generate)
-        layout.addWidget(self.generate_btn)
-
-        self.save_btn = QPushButton("Save image…")
-        self.save_btn.clicked.connect(self._on_save)
-        self.save_btn.setEnabled(False)
-        layout.addWidget(self.save_btn)
-
-        self.export_csv_btn = QPushButton("Export F0 + formants (CSV)…")
-        self.export_csv_btn.clicked.connect(self._on_export_csv)
-        self.export_csv_btn.setEnabled(False)
-        layout.addWidget(self.export_csv_btn)
-
-        layout.addStretch(1)
-
-        # Scrollable wrapper: if the window's usable height is shorter than
-        # all the group boxes stacked at their natural size (e.g. maximized
-        # on a shorter display), scroll instead of squishing every row.
-        scroll = QScrollArea()
-        scroll.setWidget(panel)
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setMinimumWidth(380)
-        scroll.setMaximumWidth(480)
-        return scroll
+        return box
 
     def _build_canvas(self):
         container = QWidget()
@@ -280,38 +412,65 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.canvas)
         return container
 
-    # ---------- data loading ----------
+    # ---------- data source ----------
 
-    @staticmethod
-    def _set_path_display(line_edit, path):
-        # Show just the last component — the full path only fits by scrolling
-        # to whichever end the cursor happens to be at, which reads as garbled.
-        line_edit.setText(os.path.basename(os.path.normpath(path)) or path)
-        line_edit.setToolTip(path)
+    def _on_annotation_toggled(self, checked):
+        self.annotation_row.setEnabled(checked)
+        self.annotation_hint.setText(
+            "Bouts, element times and the reference HzMin / HzMax come from the annotation file."
+            if checked else
+            f"Calls are detected automatically from the audio and grouped into bouts by pauses "
+            f"longer than {BOUT_GAP_S:g} s. Element type is not classified.")
+        self._update_measurement_controls()
+        if self.project is not None and self.project.uses_annotation != checked:
+            self.status.showMessage("Click Load library to apply the annotation setting.")
+
+    def _update_measurement_controls(self):
+        has_ann = self.use_annotation_check.isChecked()
+        ann_item = self.hz_source_combo.model().item(1)
+        ann_item.setEnabled(has_ann)
+        if not has_ann and self.hz_source_combo.currentData() == "annotation":
+            self.hz_source_combo.setCurrentIndex(0)
+        self.show_annotation_check.setEnabled(has_ann and self.hz_source_combo.currentData() == "auto")
 
     def _browse_annotation_file(self):
         path, _ = QFileDialog.getOpenFileName(
             self, "Choose annotation file", self.annotation_path, "Excel files (*.xlsx *.xls)")
         if path:
             self.annotation_path = path
-            self._set_path_display(self.annotation_edit, path)
+            self.annotation_row.set_path(path)
 
     def _browse_audio_folder(self):
         path = QFileDialog.getExistingDirectory(self, "Choose audio library folder", self.audio_dir_path)
         if path:
             self.audio_dir_path = path
-            self._set_path_display(self.audio_edit, path)
+            self.audio_row.set_path(path)
+
+    def _browse_output_folder(self):
+        path = QFileDialog.getExistingDirectory(self, "Choose output folder", self.output_dir_path)
+        if path:
+            self.output_dir_path = path
+            self.output_row.set_path(path)
+            if self.project is not None:
+                self.project.output_base_dir = path
+
+    def _open_output_folder(self):
+        os.makedirs(self.output_dir_path, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(self.output_dir_path))
 
     def _load_project(self):
+        use_ann = self.use_annotation_check.isChecked()
         try:
+            self.status.showMessage("Loading library…")
+            QApplication.processEvents()
             self.project = SpectrogramProject(
-                APP_DIR,
-                annotation_file=self.annotation_path,
-                audio_base_dir=self.audio_dir_path,
+                self.audio_dir_path,
+                annotation_file=self.annotation_path if use_ann else None,
+                output_base_dir=self.output_dir_path,
             )
         except Exception as exc:
             QMessageBox.critical(self, "Failed to load library",
-                                  f"Could not load the annotation file / audio folder:\n{exc}")
+                                 f"Could not load the annotation file / audio folder:\n{exc}")
             return
 
         singers = self.project.list_singers()
@@ -319,9 +478,15 @@ class MainWindow(QMainWindow):
         self.animal_combo.clear()
         self.animal_combo.addItems(singers)
         self.animal_combo.blockSignals(False)
+        self.batch_animal_combo.blockSignals(True)
+        self.batch_animal_combo.clear()
+        self.batch_animal_combo.addItems([ALL_ANIMALS] + singers)
+        self.batch_animal_combo.blockSignals(False)
         self._on_animal_changed(self.animal_combo.currentText())
+        self._update_batch_summary()
 
-        if not singers:
+        n_wav = len(self.project._wav_index)
+        if not singers and use_ann:
             raw_singers = sorted(self.project.ann["Singer"].dropna().astype(str).unique())
             QMessageBox.warning(
                 self, "No matching audio found",
@@ -333,8 +498,14 @@ class MainWindow(QMainWindow):
                 f"needs to contain files named <Recording ID>.wav."
             )
             self.status.showMessage("Loaded annotation file, but found no matching audio files.")
+        elif not singers:
+            self.status.showMessage(f"No .wav files found under {self.audio_dir_path}.")
+        elif use_ann:
+            self.status.showMessage(
+                f"Loaded {len(self.project.ann)} annotation rows, {n_wav} audio file(s), {len(singers)} animal(s).")
         else:
-            self.status.showMessage(f"Loaded {len(self.project.ann)} annotation rows, {len(singers)} animal(s) found.")
+            self.status.showMessage(
+                f"Loaded {n_wav} audio file(s), {len(singers)} animal(s) — calls will be detected automatically.")
 
     def _on_animal_changed(self, animal):
         self.recording_combo.blockSignals(True)
@@ -348,10 +519,19 @@ class MainWindow(QMainWindow):
         self.bout_combo.clear()
         animal = self.animal_combo.currentText()
         if animal and song_id and self.project:
-            bouts = self.project.list_bouts(animal, song_id)
+            if not self.project.uses_annotation:
+                self.status.showMessage(f"Detecting calls in {song_id}…")
+                QApplication.processEvents()
+            try:
+                bouts = self.project.list_bouts(animal, song_id)
+            except Exception as exc:
+                QMessageBox.warning(self, "Could not read recording", str(exc))
+                return
             self.bout_combo.addItems([str(b) for b in bouts])
+            if not self.project.uses_annotation:
+                self.status.showMessage(f"{song_id}: {len(bouts)} bout(s) detected.")
 
-    # ---------- actions ----------
+    # ---------- single recording ----------
 
     def _current_settings(self):
         return RenderSettings(
@@ -390,10 +570,11 @@ class MainWindow(QMainWindow):
         try:
             _, meta = self.project.render(animal, song_id, int(bout_text), self._current_settings(), fig=self.fig)
             self.canvas.draw()
+            self.last_render = (animal, song_id, int(bout_text), meta["measurements"])
             self.save_btn.setEnabled(True)
-            self.last_measurements = (animal, song_id, int(bout_text), meta["measurements"])
             self.export_csv_btn.setEnabled(True)
-            msg = f"Bout {bout_text} spans {meta['t_start']:.2f}s – {meta['t_end']:.2f}s."
+            n = len(meta["measurements"])
+            msg = f"Bout {bout_text}: {n} element(s), {meta['t_start']:.2f}s – {meta['t_end']:.2f}s."
             diffs = [abs(m[f"auto_hz{k}"] - m[f"annotated_hz{k}"])
                      for m in meta["measurements"] for k in ("max", "min")
                      if m[f"auto_hz{k}"] == m[f"auto_hz{k}"] and m[f"annotated_hz{k}"] == m[f"annotated_hz{k}"]]
@@ -411,34 +592,116 @@ class MainWindow(QMainWindow):
             self.generate_btn.setEnabled(True)
 
     def _on_save(self):
-        animal = self.animal_combo.currentText()
-        song_id = self.recording_combo.currentText()
-        bout_text = self.bout_combo.currentText()
-        default_path = self.project.default_output_path(animal, song_id, int(bout_text))
-        path, _ = QFileDialog.getSaveFileName(self, "Save spectrogram image", default_path, "PNG image (*.png)")
-        if not path:
-            return
+        animal, song_id, bout, _ = self.last_render
+        path = self.project.bout_path(animal, song_id, bout, ".png")
         settings = self._current_settings()
         try:
             self.project.save_figure(
                 self.fig, path, settings.image_dpi,
                 width_in=settings.figure_width, height_in=settings.figure_height,
             )
-            self.status.showMessage(f"Saved to {path}")
+            self.status.showMessage(f"Saved image to {path}")
         except Exception as exc:
             QMessageBox.critical(self, "Save failed", str(exc))
 
     def _on_export_csv(self):
-        animal, song_id, bout, measurements = self.last_measurements
-        default_path = os.path.splitext(self.project.default_output_path(animal, song_id, bout))[0] + "_hz.csv"
-        path, _ = QFileDialog.getSaveFileName(self, "Export F0 + formants", default_path, "CSV file (*.csv)")
-        if not path:
-            return
+        animal, song_id, bout, measurements = self.last_render
+        path = self.project.bout_path(animal, song_id, bout, "_hz.csv")
         try:
             self.project.export_measurements(measurements, path, animal, song_id, bout)
-            self.status.showMessage(f"Exported {len(measurements)} element(s) to {path}")
+            self.status.showMessage(f"Saved {len(measurements)} element(s) to {path}")
         except Exception as exc:
             QMessageBox.critical(self, "Export failed", str(exc))
+
+    # ---------- batch ----------
+
+    def _batch_recordings(self):
+        if not self.project:
+            return []
+        choice = self.batch_animal_combo.currentText()
+        animals = self.project.list_singers() if choice == ALL_ANIMALS else [choice]
+        return [(a, s) for a in animals if a for s in self.project.list_recordings(a)]
+
+    def _update_batch_summary(self, *_):
+        recs = self._batch_recordings()
+        if not self.project:
+            self.batch_summary.setText("Load a library first.")
+            return
+        how = "bouts from the annotation file" if self.project.uses_annotation else "calls detected automatically"
+        self.batch_summary.setText(f"{len(recs)} recording(s) — {how}.")
+
+    def _on_run_batch(self):
+        recordings = self._batch_recordings()
+        if not recordings:
+            QMessageBox.warning(self, "Nothing to process", "No recordings found for this selection.")
+            return
+        outputs = dict(save_png=self.batch_png_check.isChecked(),
+                       csv_per_recording=self.batch_rec_csv_check.isChecked(),
+                       combined_csv=self.batch_all_csv_check.isChecked())
+        if not any(outputs.values()):
+            QMessageBox.warning(self, "No output selected", "Tick at least one output.")
+            return
+
+        self.project.output_base_dir = self.output_dir_path
+        self.batch_log.clear()
+        self.batch_log.appendPlainText(f"Processing {len(recordings)} recording(s) → {self.output_dir_path}")
+        self.batch_progress.setRange(0, 0)  # busy until the bout count is known
+        self._set_batch_running(True)
+
+        self._batch_thread = QThread(self)
+        self._batch_worker = BatchWorker(self.project, recordings, self._current_settings(), outputs)
+        self._batch_worker.moveToThread(self._batch_thread)
+        self._batch_thread.started.connect(self._batch_worker.run)
+        self._batch_worker.progress.connect(self._on_batch_progress)
+        self._batch_worker.finished.connect(self._on_batch_finished)
+        self._batch_worker.failed.connect(self._on_batch_failed)
+        self._batch_worker.finished.connect(self._batch_thread.quit)
+        self._batch_worker.failed.connect(self._batch_thread.quit)
+        self._batch_thread.start()
+
+    def _on_cancel_batch(self):
+        if self._batch_worker:
+            self._batch_worker.stop()
+            self.batch_cancel_btn.setEnabled(False)
+            self.batch_log.appendPlainText("Cancelling after the current bout…")
+
+    def _on_batch_progress(self, done, total, msg):
+        self.batch_progress.setRange(0, total)
+        self.batch_progress.setValue(done)
+        self.batch_log.appendPlainText(msg)
+        self.status.showMessage(f"Batch: {done}/{total} bouts")
+
+    def _on_batch_finished(self, result):
+        self._set_batch_running(False)
+        state = "Cancelled" if result.get("cancelled") else "Done"
+        self.batch_log.appendPlainText(
+            f"{state}: {result['bouts']}/{result['total']} bout(s), {len(result['files'])} file(s) written, "
+            f"{len(result['errors'])} error(s).")
+        for e in result["errors"]:
+            self.batch_log.appendPlainText(f"  ! {e}")
+        self.status.showMessage(f"Batch {state.lower()}: {len(result['files'])} file(s) in {self.output_dir_path}")
+
+    def _on_batch_failed(self, tb):
+        self._set_batch_running(False)
+        self.batch_log.appendPlainText("Batch failed.")
+        QMessageBox.critical(self, "Batch failed", tb)
+
+    def _set_batch_running(self, running):
+        for w in (self.data_box, self.generate_btn, self.save_btn, self.export_csv_btn,
+                  self.batch_run_btn, self.batch_animal_combo, self.output_row):
+            w.setEnabled(not running)
+        if not running:
+            self.save_btn.setEnabled(self.last_render is not None)
+            self.export_csv_btn.setEnabled(self.last_render is not None)
+            self.batch_progress.setRange(0, max(1, self.batch_progress.maximum()))
+        self.batch_cancel_btn.setEnabled(running)
+
+    def closeEvent(self, event):
+        if self._batch_thread is not None and self._batch_thread.isRunning():
+            self._batch_worker.stop()
+            self._batch_thread.quit()
+            self._batch_thread.wait(5000)
+        super().closeEvent(event)
 
 
 def main():
