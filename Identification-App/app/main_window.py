@@ -49,6 +49,7 @@ from PySide6.QtWidgets import (
 
 import paths
 from hyrax_id.preprocess import PreprocessConfig, PreprocessConfigError, find_settings_for_weights
+from hyrax_id.speakers import SpeakerList, SpeakerListError, find_speaker_list_for_weights
 from results_model import COLUMNS, ResultsModel
 from worker import InferenceWorker
 
@@ -213,6 +214,7 @@ class MainWindow(QMainWindow):
         section["output_path"] = self.output_path_edit.text()
         section["device"] = self.device_combo.currentData()
         section["preprocess_cfg_path"] = self.preprocess_edit.text()
+        section["speaker_list_path"] = self.speaker_edit.text()
 
         for prefix, _label, _default in MODEL_PATH_FIELDS:
             section[f"{prefix}_model_path"] = self._model_path_edits[prefix].text()
@@ -273,6 +275,8 @@ class MainWindow(QMainWindow):
         # Older .cfg files have no preprocess_cfg_path: keep whatever is there (or found next to the weights).
         if "preprocess_cfg_path" in section:
             self.preprocess_edit.setText(section.get("preprocess_cfg_path", ""))
+        if "speaker_list_path" in section:
+            self.speaker_edit.setText(section.get("speaker_list_path", ""))
 
         # Older .cfg files have no denoise/classify keys: leave those boxes as they are.
         for stage_key, checkbox in self._stage_checkboxes.items():
@@ -371,7 +375,8 @@ class MainWindow(QMainWindow):
             edit = QLineEdit()
             edit.setText(default)
             browse_button = QPushButton("Browse...")
-            handler = self._browse_detector_path if prefix == "detector" else self._browse_model_path
+            handler = {"detector": self._browse_detector_path,
+                       "animal_classifier": self._browse_classifier_path}.get(prefix, self._browse_model_path)
             browse_button.clicked.connect(lambda _checked=False, e=edit, h=handler: h(e))
             row.addWidget(edit)
             row.addWidget(browse_button)
@@ -382,6 +387,8 @@ class MainWindow(QMainWindow):
 
             if prefix == "detector":
                 self._build_preprocess_row(layout)
+            elif prefix == "animal_classifier":
+                self._build_speaker_row(layout)
 
         return group
 
@@ -398,6 +405,10 @@ class MainWindow(QMainWindow):
             self._model_path_edits[prefix].setEnabled(enabled)
             self._model_browse_buttons[prefix].setEnabled(enabled)
 
+        classify_on = self._stage_checkboxes["classify"].isChecked()
+        for widget in (self.speaker_edit, self.speaker_browse_button, self.speaker_summary):
+            widget.setEnabled(classify_on)
+
         denoise_on = self._stage_checkboxes["denoise"].isChecked()
         for name in DENOISER_PARAM_NAMES:
             self._advanced_widgets[name].setEnabled(denoise_on)
@@ -410,6 +421,75 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(self, "Select model file")
         if path:
             line_edit.setText(path)
+
+    # -- speaker list of the classifier ----------------------------------------
+
+    def _build_speaker_row(self, layout):
+        layout.addWidget(QLabel("Speaker list (.json, class index = position)"))
+        row = QHBoxLayout()
+        self.speaker_edit = QLineEdit()
+        self.speaker_edit.setText(self._default_speaker_path())
+        self.speaker_browse_button = QPushButton("Browse...")
+        self.speaker_browse_button.clicked.connect(self._browse_speaker_list)
+        row.addWidget(self.speaker_edit)
+        row.addWidget(self.speaker_browse_button)
+        layout.addLayout(row)
+
+        self.speaker_summary = QLabel()
+        self.speaker_summary.setWordWrap(True)
+        layout.addWidget(self.speaker_summary)
+
+        self.speaker_edit.textChanged.connect(self._refresh_speaker_summary)
+        self._model_path_edits["animal_classifier"].textChanged.connect(self._refresh_speaker_summary)
+        self._refresh_speaker_summary()
+
+    @staticmethod
+    def _default_speaker_path():
+        """The bundled current.json if there is one, else one next to the default weights, else empty."""
+        if os.path.isfile(paths.SPEAKER_LIST_PATH):
+            return paths.SPEAKER_LIST_PATH
+        found = find_speaker_list_for_weights(paths.ANIMAL_CLASSIFIER_MODEL_PATH)
+        return str(found) if found else ""
+
+    def _refresh_speaker_summary(self, _text=None):
+        """Show which speakers the chosen list holds (or why it can't be used) right under the field."""
+        path = self.speaker_edit.text().strip()
+        ok_style, bad_style = "color: #9a9a9a; font-size: 9pt;", "color: #d9534f; font-size: 9pt;"
+        if not path:
+            weights = self._model_path_edits["animal_classifier"].text().strip()
+            if find_speaker_list_for_weights(weights):
+                self.speaker_summary.setStyleSheet(ok_style)
+                self.speaker_summary.setText("Empty: current.json next to the classifier weights will be used.")
+            else:
+                self.speaker_summary.setStyleSheet(bad_style)
+                self.speaker_summary.setText("No speaker list chosen -- select the JSON list of the classifier.")
+            return
+        try:
+            speakers = SpeakerList.from_file(path)
+        except SpeakerListError as exc:
+            self.speaker_summary.setStyleSheet(bad_style)
+            self.speaker_summary.setText(str(exc))
+            return
+        self.speaker_summary.setStyleSheet(ok_style)
+        self.speaker_summary.setText(speakers.describe())
+
+    def _browse_speaker_list(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Select the speaker list", self.speaker_edit.text().strip(), "Speaker list (*.json);;All files (*)"
+        )
+        if path:
+            self.speaker_edit.setText(path)
+
+    def _browse_classifier_path(self, line_edit):
+        """Choosing new classifier weights also picks up the current.json stored next to them."""
+        path, _ = QFileDialog.getOpenFileName(self, "Select classifier weights", "", "PyTorch weights (*.pt *.pth);;All files (*)")
+        if not path:
+            return
+        line_edit.setText(path)
+        found = find_speaker_list_for_weights(path)
+        if found:
+            self.speaker_edit.setText(str(found))
+            self.status_label.setText(f"Using the speaker list found next to the weights: {found}")
 
     # -- preprocessing config (the YOLO app's settings file) ------------------
 
@@ -646,6 +726,24 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Preprocessing config problem", str(exc))
                 return
 
+        if self._stage_checkboxes["classify"].isChecked():
+            classifier_path = self._model_path_edits["animal_classifier"].text().strip()
+            speaker_path = self.speaker_edit.text().strip()
+            if not speaker_path and not find_speaker_list_for_weights(classifier_path):
+                QMessageBox.warning(
+                    self,
+                    "Missing speaker list",
+                    "Please choose the JSON list of speaker names the classifier was trained with "
+                    "(or put current.json next to the classifier weights).",
+                )
+                return
+            if speaker_path:
+                try:
+                    SpeakerList.from_file(speaker_path)
+                except SpeakerListError as exc:
+                    QMessageBox.warning(self, "Speaker list problem", str(exc))
+                    return
+
         self._start_inference()
 
     def _start_inference(self):
@@ -680,6 +778,7 @@ class MainWindow(QMainWindow):
             output_path=output_path,
             detector_model_path=self._model_path_edits["detector"].text().strip(),
             preprocess_cfg_path=self.preprocess_edit.text().strip() or None,
+            speaker_list_path=self.speaker_edit.text().strip() or None,
             garbage_filter_model_path=self._model_path_edits["garbage_filter"].text().strip(),
             animal_classifier_model_path=(
                 self._model_path_edits["animal_classifier"].text().strip() if classify else None

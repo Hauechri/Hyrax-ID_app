@@ -186,3 +186,94 @@ def test_start_passes_the_standardize_settings(win, tmp_path, monkeypatch):
     while win._thread is not None and time.time() < deadline:
         QCoreApplication.processEvents(); time.sleep(0.01)
     assert seen["standardize_audio"] is True and seen["target_sample_rate"] == 44100 and seen["audio_workers"] == 0
+
+
+# ------------------------------------------------------------------------------ speaker list row
+SPEAKERS_DIR = os.path.join(os.path.dirname(CONFIGS), "speakers")
+CURRENT = os.path.join(SPEAKERS_DIR, "current.json")
+VLAD = os.path.join(SPEAKERS_DIR, "VLAD.json")
+
+
+def test_speaker_summary_shows_the_list_or_why_it_fails(win, tmp_path):
+    win.speaker_edit.setText("")
+    assert "No speaker list chosen" in win.speaker_summary.text()
+    win.speaker_edit.setText(CURRENT)
+    t = win.speaker_summary.text()
+    assert "19 speakers" in t and "Bachelor-cut-in-40" in t and "position" in t
+    win.speaker_edit.setText(VLAD)
+    assert "18 speakers" in win.speaker_summary.text() and "J9" in win.speaker_summary.text()
+    dup = tmp_path / "dup.json"; dup.write_text('["a","a"]')
+    win.speaker_edit.setText(str(dup))
+    assert "Duplicate" in win.speaker_summary.text()
+
+
+def test_choosing_classifier_weights_picks_up_current_json(win, tmp_path, monkeypatch):
+    run = tmp_path / "ecapa"; run.mkdir()
+    shutil.copy(CURRENT, run / "current.json"); (run / "best_model.pt").write_bytes(b"w")
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", staticmethod(lambda *a, **k: (str(run / "best_model.pt"), "")))
+    win.speaker_edit.setText("")
+    win._browse_classifier_path(win._model_path_edits["animal_classifier"])
+    assert win.speaker_edit.text() == str(run / "current.json")
+    assert "19 speakers" in win.speaker_summary.text() and "next to the weights" in win.status_label.text()
+
+
+def test_empty_speaker_field_is_ok_when_current_json_sits_next_to_the_weights(win, tmp_path):
+    run = tmp_path / "e"; run.mkdir()
+    shutil.copy(CURRENT, run / "current.json"); (run / "best_model.pt").write_bytes(b"w")
+    win._model_path_edits["animal_classifier"].setText(str(run / "best_model.pt"))
+    win.speaker_edit.setText("")
+    assert "will be used" in win.speaker_summary.text()
+
+
+def test_speaker_row_follows_the_classify_checkbox(win):
+    box = win._stage_checkboxes["classify"]
+    assert win.speaker_edit.isEnabled() and win.speaker_browse_button.isEnabled()
+    box.setChecked(False)
+    assert not win.speaker_edit.isEnabled() and not win.speaker_browse_button.isEnabled() and not win.speaker_summary.isEnabled()
+    box.setChecked(True)
+    assert win.speaker_edit.isEnabled()
+
+
+def test_speaker_path_is_saved_and_loaded(win, tmp_path, monkeypatch):
+    win.speaker_edit.setText(VLAD)
+    out = str(tmp_path / "s.cfg")
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", staticmethod(lambda *a, **k: (out, "")))
+    win._save_config()
+    win.speaker_edit.setText("")
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", staticmethod(lambda *a, **k: (out, "")))
+    win._load_config()
+    assert win.speaker_edit.text() == VLAD
+
+
+def _ready_with_classifier(win, tmp_path, speaker_path):
+    _ready_for_start(win, tmp_path, MEL)
+    win._stage_checkboxes["classify"].setChecked(True)
+    f = tmp_path / "cls" / "best_model.pt"; f.parent.mkdir(exist_ok=True); f.write_bytes(b"m")
+    win._model_path_edits["animal_classifier"].setText(str(f))
+    win.speaker_edit.setText(speaker_path)
+
+
+def test_start_is_blocked_without_a_usable_speaker_list(win, tmp_path):
+    _ready_with_classifier(win, tmp_path, "")
+    win._on_start()
+    assert win._thread is None and "speaker names" in win._shown[-1][1]
+    bad = tmp_path / "bad.json"; bad.write_text("[]")
+    win.speaker_edit.setText(str(bad)); win._on_start()
+    assert win._thread is None and "empty" in win._shown[-1][1]
+    win._stage_checkboxes["classify"].setChecked(False)                  # not classifying: no list needed
+    n = len(win._shown)
+    win.speaker_edit.setText("")
+    win._on_start()
+    assert len(win._shown) == n
+
+
+def test_start_passes_the_speaker_list_to_the_pipeline(win, tmp_path, monkeypatch):
+    import worker
+    seen = {}
+    monkeypatch.setattr(worker, "run_batch", lambda **kw: seen.update(kw))
+    _ready_with_classifier(win, tmp_path, CURRENT)
+    win._on_start()
+    deadline = time.time() + 10
+    while win._thread is not None and time.time() < deadline:
+        QCoreApplication.processEvents(); time.sleep(0.01)
+    assert seen["speaker_list_path"] == CURRENT and seen["classify"] is True

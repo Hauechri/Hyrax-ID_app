@@ -11,9 +11,10 @@ from pathlib import Path
 
 from hyrax_id.audio_io import collect_wav_files
 from hyrax_id.audio_standardize import DEFAULT_SILENCE_THRESHOLD, standardize_files
-from hyrax_id.config import SPEAKER_LIST, SR  # noqa: F401  (re-exported)
+from hyrax_id.config import SR
 from hyrax_id.pipeline import run_pipeline
 from hyrax_id.preprocess import PreprocessConfig, PreprocessConfigError, find_settings_for_weights
+from hyrax_id.speakers import SpeakerList, SpeakerListError, find_speaker_list_for_weights
 
 # Calibration constants. These are tied to the trained garbage-filter/classifier checkpoints --
 # change only if you know why.
@@ -51,6 +52,19 @@ def resolve_preprocess(preprocess_cfg_path, detector_model_path) -> PreprocessCo
     cfg = PreprocessConfig.from_file(path)
     print(f"[INFO] Preprocessing config: {path}")
     return cfg
+
+
+def resolve_speakers(speaker_list_path, classifier_model_path) -> SpeakerList:
+    """Load the classifier's speaker list. No explicit path -> `current.json` next to the classifier weights.
+    Raises SpeakerListError with a clear message."""
+    path = speaker_list_path or find_speaker_list_for_weights(classifier_model_path)
+    if not path:
+        raise SpeakerListError(
+            "No speaker list given and no current.json found next to the classifier weights. Choose the JSON "
+            "list of speaker names the classifier was trained with.")
+    speakers = SpeakerList.from_file(path)
+    print(f"[INFO] Speaker list: {path}")
+    return speakers
 
 
 def list_input_stems(audio_path):
@@ -102,9 +116,12 @@ def parse_bout_results(label_path):
                 start_s, end_s, label = line.split("\t")
                 start, end = float(start_s), float(end_s)
                 if label.startswith("BOUT"):
-                    parts = label[len("BOUT"):].split("_", 2)
-                    if len(parts) == 3:
-                        bout_id_s, animal, conf_s = parts
+                    # "BOUT{n}_{animal}_{conf}": the animal name may itself contain underscores, so the
+                    # id is split off from the left and the confidence from the right.
+                    parts = label[len("BOUT"):].split("_", 1)
+                    if len(parts) == 2:
+                        bout_id_s = parts[0]
+                        animal, conf_s = parts[1].rsplit("_", 1)
                         confidence = float(conf_s)
                     else:
                         # classification was disabled: bare "BOUT{n}"
@@ -147,6 +164,8 @@ def run_batch(
     classify=True,
     preprocess_cfg_path=None,
     preprocess=None,
+    speaker_list_path=None,
+    speakers=None,
     window_overlap_percent=None,
     detector_peak_normalize=True,
     standardize_audio=True,
@@ -172,7 +191,9 @@ def run_batch(
 
     preprocess_cfg_path: the YOLO app's settings file for the detector (animalspot_config.json or a "Save
     settings" export). Omitted -> looked up next to detector_model_path. `preprocess` may be a ready
-    PreprocessConfig instead. window_overlap_percent: None -> the settings file's value, else 50.
+    PreprocessConfig instead. speaker_list_path: JSON list of the classifier's speaker names (class index =
+    position); omitted -> `current.json` next to the classifier weights; `speakers` may be a ready SpeakerList.
+    Only needed when classify=True. window_overlap_percent: None -> the settings file's value, else 50.
     detector_peak_normalize: see run_pipeline. debug_image_dir: if set, the first `debug_max_images`
     detector input images are saved there.
 
@@ -195,6 +216,8 @@ def run_batch(
             param_overrides.pop(name)
     if preprocess is None:
         preprocess = resolve_preprocess(preprocess_cfg_path, detector_model_path)
+    if classify and speakers is None:
+        speakers = resolve_speakers(speaker_list_path, animal_classifier_model_path)
     if window_overlap_percent is not None and not 0 <= window_overlap_percent < 100:
         raise ValueError("window_overlap_percent must be at least 0 and below 100.")
 
@@ -241,7 +264,7 @@ def run_batch(
             Denoiser_model_path=str(denoiser_model_path) if denoise else None,
             audio_folder=folder,
             output_path=str(output_path),
-            num_classes=len(SPEAKER_LIST),
+            speakers=speakers if classify else None,
             debug_denoised_dir=debug_denoised_dir,
             debug_image_dir=debug_image_dir,
             debug_max_images=debug_max_images,

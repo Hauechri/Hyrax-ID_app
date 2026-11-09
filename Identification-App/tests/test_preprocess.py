@@ -245,5 +245,5 @@ def test_unknown_detector_class_fails_early():
     with pytest.raises(ValueError, match="garbage filter does not know"):
         P.load_models(detector_path="d", garbage_path="g", classifier_path=None, denoiser_path=None, preprocess=cfg,
                       detector_threshold=0.3, detector_iou=0.7, detector_batch_size=4, debug_saver=None,
-                      num_classes=18, input_dim=64, emb_dim=192, device=MagicMock(type="cpu"),
+                      speakers=None, input_dim=64, emb_dim=192, device=MagicMock(type="cpu"),
                       denoise=False, classify=False)

@@ -3,7 +3,7 @@ from pathlib import Path
 
 from .audio_io import load_audio, load_audio_segment
 from .classifier import waveform_to_logmel
-from .config import SR, SPEAKER_TO_ID
+from .config import SR
 
 
 def parse_annotation_file(path):
@@ -45,7 +45,7 @@ def assign_elements_to_bouts(elements, bouts):
     return bout_data
 
 
-def process_file(wav_path, txt_path):
+def process_file(wav_path, txt_path, speaker_to_id):
     """Training-data prep helper. Not used for inference."""
     waveform, sr = load_audio(wav_path)
     assert sr == SR, f"Sample rate mismatch: {sr}"
@@ -58,7 +58,7 @@ def process_file(wav_path, txt_path):
     parts = stem.split("_")
     speaker = parts[0]
 
-    label = SPEAKER_TO_ID[speaker]
+    label = speaker_to_id[speaker]
 
     for bout in bout_data:
         element_images = [

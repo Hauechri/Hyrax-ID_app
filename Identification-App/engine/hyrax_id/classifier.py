@@ -4,7 +4,6 @@ import torch
 import torchaudio
 
 from .audio_io import load_audio_segment
-from .config import ID_TO_SPEAKER
 
 
 def waveform_to_logmel(
@@ -70,10 +69,12 @@ def run_classifier_on_bout(model, mel_list, device):
     return pred, confidence
 
 
-def predict_animals_for_file(original_waveform, sr, bout_data, model, device):
+def predict_animals_for_file(original_waveform, sr, bout_data, model, device, id_to_speaker):
     """
     For each bout, extract its elements from the ORIGINAL (non-denoised)
     audio, compute log-mel spectrograms, and classify the bout.
+
+    id_to_speaker maps the classifier's output index to the speaker name (see speakers.SpeakerList).
 
     Adds "animal" and "animal_confidence" keys to each bout dict in place,
     and returns the (mutated) bout_data list.
@@ -92,7 +93,7 @@ def predict_animals_for_file(original_waveform, sr, bout_data, model, device):
 
         pred, confidence = run_classifier_on_bout(model, mel_list, device)
 
-        bout["animal"] = ID_TO_SPEAKER.get(pred, f"unknown_id_{pred}")
+        bout["animal"] = id_to_speaker.get(pred, f"unknown_id_{pred}")
         bout["animal_confidence"] = confidence
 
     return bout_data

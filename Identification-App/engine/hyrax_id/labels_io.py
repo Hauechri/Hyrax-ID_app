@@ -21,6 +21,6 @@ def save_full_audacity_labels(bout_data, output_path):
 
     lines.sort(key=lambda x: x[0])
 
-    with open(output_path, "w") as f:
+    with open(output_path, "w", encoding="utf-8") as f:   # parse_bout_results reads utf-8
         for start, end, label in lines:
             f.write(f"{start:.6f}\t{end:.6f}\t{label}\n")

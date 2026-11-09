@@ -20,7 +20,7 @@ from .garbage_filter import LABEL_MAP
 from .labels_io import save_full_audacity_labels
 from .postprocess import build_bout_data
 from .preprocess import PreprocessConfig
-from .model_ECAPATDNN import ECAPATDNNBoutModel
+from .speakers import SpeakerList, explain_class_count_mismatch
 
 
 @dataclass
@@ -40,7 +40,7 @@ def select_device(device_override=None) -> torch.device:
 
 
 def load_models(*, detector_path, garbage_path, classifier_path, denoiser_path, preprocess, detector_threshold,
-                detector_iou, detector_batch_size, debug_saver, num_classes, input_dim, emb_dim,
+                detector_iou, detector_batch_size, debug_saver, speakers, input_dim, emb_dim,
                 device, denoise, classify) -> Models:
     if denoise:
         from .denoiser import load_denoiser
@@ -68,10 +68,18 @@ def load_models(*, detector_path, garbage_path, classifier_path, denoiser_path, 
 
     classifier = None
     if classify:
-        classifier = ECAPATDNNBoutModel(num_classes=num_classes, input_dim=input_dim, emb_dim=emb_dim)
-        classifier.load_state_dict(torch.load(classifier_path, map_location=device))
+        from model_ECAPATDNN import ECAPATDNNBoutModel
+        classifier = ECAPATDNNBoutModel(num_classes=len(speakers), input_dim=input_dim, emb_dim=emb_dim)
+        try:
+            classifier.load_state_dict(torch.load(classifier_path, map_location=device))
+        except RuntimeError as exc:
+            hint = explain_class_count_mismatch(str(exc), len(speakers))
+            if hint:
+                raise ValueError(hint) from exc
+            raise
         classifier.to(device).eval()
         print(f"[INFO] Animal classifier loaded: {classifier_path}")
+        print(f"[INFO] Speaker list: {speakers.describe()}")
     else:
         print("[INFO] Classification disabled -- labels will contain bouts and elements only (no animal ID).")
 
@@ -105,7 +113,7 @@ def run_pipeline(
     context_windowsize,
     GB_threshold,
     GB_scoreweight,
-    num_classes,
+    speakers: SpeakerList | None = None,
     input_dim=64,
     emb_dim=192,
     window_overlap_percent=None,
@@ -121,6 +129,7 @@ def run_pipeline(
     detector_peak_normalize=True,
 ):
     """
+    speakers:      SpeakerList for the classifier (class index -> name); required when classify=True.
     preprocess:    PreprocessConfig loaded from the YOLO app's settings file -- the single source of truth for
                    window length, image size, channels and imgsz.
     window_overlap_percent: overlap of consecutive detector windows (None = the settings file's value, else 50).
@@ -134,6 +143,8 @@ def run_pipeline(
         raise ValueError("denoise=True requires Denoiser_model_path.")
     if classify and not Animal_Classifier_model_path:
         raise ValueError("classify=True requires Animal_Classifier_model_path.")
+    if classify and speakers is None:
+        raise ValueError("classify=True requires a speaker list (speakers=SpeakerList...).")
 
     device = select_device(device_override)
     print(f"[INFO] Using device: {device}")
@@ -153,7 +164,7 @@ def run_pipeline(
         detector_path=Detector_model_path, garbage_path=GarbageFilter_model_path,
         classifier_path=Animal_Classifier_model_path, denoiser_path=Denoiser_model_path,
         preprocess=preprocess, detector_threshold=detector_threshold, detector_iou=detector_iou,
-        detector_batch_size=detector_batch_size, debug_saver=debug_saver, num_classes=num_classes,
+        detector_batch_size=detector_batch_size, debug_saver=debug_saver, speakers=speakers,
         input_dim=input_dim, emb_dim=emb_dim, device=device, denoise=denoise, classify=classify)
 
     os.makedirs(output_path, exist_ok=True)
@@ -194,7 +205,8 @@ def run_pipeline(
             original_waveform, sr = load_audio(original_path)       # classifier always uses the ORIGINAL audio
             if sr != SR:
                 print(f"  [WARN] {stem}: sample rate {sr} != expected {SR}")
-            bout_data = predict_animals_for_file(original_waveform, sr, bout_data, models.classifier, device)
+            bout_data = predict_animals_for_file(original_waveform, sr, bout_data, models.classifier, device,
+                                                 speakers.id_to_speaker)
 
 
         save_full_audacity_labels(bout_data, label_output_path)

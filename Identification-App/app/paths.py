@@ -22,6 +22,8 @@ DETECTOR_MODEL_PATH = os.path.join(MODELS_DIR, "detector", "best.pt")
 PREPROCESS_CFG_PATH = os.path.join(MODELS_DIR, "detector", "animalspot_config.json")
 GARBAGE_FILTER_MODEL_PATH = os.path.join(MODELS_DIR, "boost", "XGBRich.joblib")
 ANIMAL_CLASSIFIER_MODEL_PATH = os.path.join(MODELS_DIR, "ecapa_tdnn", "best_model.pt")
+# Names of the speakers the classifier was trained on (class index = position). Lives next to the weights.
+SPEAKER_LIST_PATH = os.path.join(MODELS_DIR, "ecapa_tdnn", "current.json")
 DENOISER_ACA_MODEL_PATH = os.path.join(MODELS_DIR, "animal-clean", "01_ACS.pk")
 
 if ENGINE_DIR not in sys.path:
