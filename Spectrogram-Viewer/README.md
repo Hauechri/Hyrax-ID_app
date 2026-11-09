@@ -25,14 +25,17 @@ python app\main.py
 1. **Data**: choose the audio folder (`.wav`). Tick **Use annotation file** to
    take bouts and element times from an Excel annotation file (see
    [app/DATA_SETUP.md](app/DATA_SETUP.md)); untick it to detect calls
-   automatically. Click **Load library**.
+   automatically. Changes apply immediately (**Reload library** re-reads the
+   folder after adding files).
 2. **Output folder**: where images and CSVs are written, as
    `<output>/<Animal>/<Recording>/<Animal>_<Recording>_bout_NN.png` / `..._hz.csv`.
 3. **Single recording** tab: pick Animal / Recording / Bout →
-   **Generate spectrogram** → **Save image** / **Save CSV**.
+   **Generate spectrogram** → **Save image** / **Save CSV**. After the first
+   Generate, changing the bout or any option redraws automatically, so a saved
+   file always matches the options shown.
    **Batch (folder)** tab: pick an animal (or all) and the outputs
    (PNG per bout, CSV per recording, one combined `batch_<date>_hz.csv`) →
-   **Run batch**.
+   **Run batch**. Runs on several CPU cores; options are locked while it runs.
 
 No data is included in this repository.
 

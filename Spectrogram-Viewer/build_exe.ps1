@@ -12,6 +12,7 @@ $ErrorActionPreference = "Stop"
     --low-memory `
     --enable-plugins=pyside6 `
     --include-package=parselmouth `
+    --include-package=python_calamine `
     --windows-console-mode=disable `
     --windows-icon-from-ico=app\assets\icon.ico `
     --include-data-dir=app\assets=assets `

@@ -34,7 +34,8 @@ BASELINE_S = 1.0                  # rolling-median window for the tonality basel
 
 def detect_calls(sig, fs):
     """Return a list of (t_start, t_end) in seconds for every detected call."""
-    f, t, S = spectrogram(sig, fs=fs, window="hamming", nperseg=256, noverlap=128, mode="psd")
+    n = max(16, int(round(256 * fs / 48000)))   # 5.3 ms window at any sample rate (256 at 48 kHz)
+    f, t, S = spectrogram(sig, fs=fs, window="hamming", nperseg=n, noverlap=n // 2, mode="psd")
     band = (f >= BAND_HZ[0]) & (f <= BAND_HZ[1])
     L = 10 * np.log10(S[band] + 1e-20)
     L = uniform_filter1d(L, 3, axis=0)                              # a little smoothing across frequency

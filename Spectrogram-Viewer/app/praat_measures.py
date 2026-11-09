@@ -40,7 +40,14 @@ PITCH_TIME_STEP = 0.0027          # ~ Avisoft hop at FFT 256 / 50 % overlap / 48
 MIN_VOICING_STRENGTH = 0.2
 SUBHARMONIC_FIX_DB = 20.0
 ENERGY_GATE_DB = 25.0
-NFFT = 1024                       # 256-sample window zero-padded -> ~47 Hz grid at 48 kHz
+AVISOFT_WINDOW_S = 256 / 48000.0  # Héloïse's FFT 256 at 48 kHz (5.3 ms), kept in seconds for other rates
+ZERO_PAD = 4                      # window zero-padded 4x -> ~47 Hz grid
+
+
+def avisoft_window(fs):
+    """(nperseg, noverlap, nfft) of the Avisoft-like spectrogram at sample rate fs."""
+    n = max(16, int(round(AVISOFT_WINDOW_S * fs)))
+    return n, n // 2, n * ZERO_PAD
 CONTEXT_PAD_S = 0.03
 
 # edge_db_*: how far below the ridge peak the band edge is; trim_q > 0 uses the
@@ -115,7 +122,8 @@ def _track(sig, fs, t0, t1):
     if len(fv) < 3:
         return None
 
-    freqs, ts, S = spectrogram(seg, fs=fs, window="hamming", nperseg=256, noverlap=128, nfft=NFFT,
+    nper, nover, nfft = avisoft_window(fs)
+    freqs, ts, S = spectrogram(seg, fs=fs, window="hamming", nperseg=nper, noverlap=nover, nfft=nfft,
                                mode="magnitude")
     ts = ts + a
     L = 20 * np.log10(S + 1e-12)

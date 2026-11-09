@@ -1,6 +1,7 @@
 numpy
 pandas
 openpyxl
+python-calamine
 matplotlib
 scipy
 PySide6
