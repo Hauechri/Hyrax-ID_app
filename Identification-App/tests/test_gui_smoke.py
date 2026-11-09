@@ -159,3 +159,30 @@ def test_progress_regex_follows_the_detector_output():
     assert worker.SLICE_PROGRESS_RE.match("  - Windows 16/48").groups() == ("16", "48")
     assert worker.SLICE_PROGRESS_RE.match("  - Windows 0/48").groups() == ("0", "48")
     assert not worker.SLICE_PROGRESS_RE.match("  - Slice 1/48")
+
+
+def test_standardize_settings_exist_and_follow_their_checkbox(win):
+    w = win._advanced_widgets
+    assert w["standardize_audio"].isChecked() and w["target_sample_rate"].value() == 48000
+    assert w["audio_workers"].value() == 4
+    w["audio_workers"].setValue(0)
+    assert w["audio_workers"].text() == "auto"
+    assert w["target_sample_rate"].isEnabled() and w["audio_workers"].isEnabled()
+    w["standardize_audio"].setChecked(False)
+    assert not w["target_sample_rate"].isEnabled() and not w["audio_workers"].isEnabled()
+    w["standardize_audio"].setChecked(True)
+    assert w["target_sample_rate"].isEnabled()
+
+
+def test_start_passes_the_standardize_settings(win, tmp_path, monkeypatch):
+    import worker
+    seen = {}
+    monkeypatch.setattr(worker, "run_batch", lambda **kw: seen.update(kw))
+    _ready_for_start(win, tmp_path, MEL)
+    win._advanced_widgets["target_sample_rate"].setValue(44100)
+    win._advanced_widgets["audio_workers"].setValue(0)
+    win._on_start()
+    deadline = time.time() + 10
+    while win._thread is not None and time.time() < deadline:
+        QCoreApplication.processEvents(); time.sleep(0.01)
+    assert seen["standardize_audio"] is True and seen["target_sample_rate"] == 44100 and seen["audio_workers"] == 0

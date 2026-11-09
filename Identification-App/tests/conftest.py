@@ -9,6 +9,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 for p in (os.path.join(ROOT, "engine"), os.path.join(ROOT, "app")):
     if p not in sys.path:
         sys.path.insert(0, p)
+REAL_SOUNDFILE = importlib.util.find_spec("soundfile") is not None   # before any stubbing
 for mod in ("torch", "torchaudio", "soundfile", "ultralytics", "xgboost"):
     if importlib.util.find_spec(mod) is None:
         stub = MagicMock()

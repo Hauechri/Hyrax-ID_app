@@ -219,7 +219,8 @@ def test_run_batch_resolves_config_next_to_weights_and_writes_empty_label_file(c
         R.run_pipeline = P.run_pipeline
         out = os.path.join(tmp, "out")
         R.run_batch(os.path.join(tmp, "rec1.wav"), out, os.path.join(run, "weights", "best.pt"), "gb.joblib",
-                    None, None, denoise=False, classify=False, window_size=48000, image_size=800)
+                    None, None, denoise=False, classify=False, standardize_audio=False,
+                    window_size=48000, image_size=800)
         log = capsys.readouterr().out
         assert "no longer a setting" in log and "3 s windows" in log
         assert os.path.getsize(os.path.join(out, "rec1_labels.txt")) == 0

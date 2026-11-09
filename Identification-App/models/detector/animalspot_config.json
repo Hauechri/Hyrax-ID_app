@@ -4,8 +4,8 @@
     "image": {
       "sample_rate": 48000,
       "window_samples": 240000,
-      "width": 980,
-      "height": 980
+      "width": 992,
+      "height": 992
     },
     "channels": [
       {

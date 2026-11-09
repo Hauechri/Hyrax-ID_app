@@ -20,6 +20,7 @@ from .garbage_filter import LABEL_MAP
 from .labels_io import save_full_audacity_labels
 from .postprocess import build_bout_data
 from .preprocess import PreprocessConfig
+from .model_ECAPATDNN import ECAPATDNNBoutModel
 
 
 @dataclass
@@ -67,7 +68,6 @@ def load_models(*, detector_path, garbage_path, classifier_path, denoiser_path, 
 
     classifier = None
     if classify:
-        from model_ECAPATDNN import ECAPATDNNBoutModel
         classifier = ECAPATDNNBoutModel(num_classes=num_classes, input_dim=input_dim, emb_dim=emb_dim)
         classifier.load_state_dict(torch.load(classifier_path, map_location=device))
         classifier.to(device).eval()

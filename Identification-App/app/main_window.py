@@ -12,7 +12,8 @@ required (and only used) while that box is ticked. The detector comes with the
 settings file of the YOLO app that trained it (the "preprocessing config"): it
 defines how the audio is turned into the detector's input images, so any detector
 the YOLO app can train works here by choosing its best.pt + that file. Advanced
-pipeline parameters (thresholds, window overlap, etc.) are exposed as editable
+pipeline parameters (thresholds, window overlap, audio standardization to mono +
+a target sample rate, etc.) are exposed as editable
 fields, and the whole left-hand configuration can be saved to / loaded from a
 .cfg file.
 """
@@ -58,6 +59,10 @@ from worker import InferenceWorker
 #   float  -> QDoubleSpinBox
 #   bool   -> QCheckBox
 ADVANCED_PARAM_SPECS = [
+    # Audio preparation: mono + resample copies of the input are made first (originals are never touched).
+    ("standardize_audio", "bool", True, {}),
+    ("target_sample_rate", "int", 48000, dict(minimum=8000, maximum=384000)),
+    ("audio_workers", "int", 4, dict(minimum=0, maximum=64, specialValueText="auto")),
     # Window length / image size / channels come from the preprocessing config, not from here.
     ("window_overlap_percent", "float", 50.0, dict(minimum=0.0, maximum=99.0, decimals=1, singleStep=5.0)),
     ("detector_peak_normalize", "bool", True, {}),
@@ -88,6 +93,9 @@ OPTIONAL_MODEL_STAGES = {
 
 # Advanced settings that only mean something while denoising is on.
 DENOISER_PARAM_NAMES = ("Denoiser_sequence_length", "Denoiser_num_worker")
+
+# Advanced settings that only mean something while audio standardization is on.
+STANDARDIZE_PARAM_NAMES = ("target_sample_rate", "audio_workers")
 
 CFG_SECTION = "hyraxid"
 
@@ -394,6 +402,10 @@ class MainWindow(QMainWindow):
         for name in DENOISER_PARAM_NAMES:
             self._advanced_widgets[name].setEnabled(denoise_on)
 
+        standardize_on = self._advanced_widgets["standardize_audio"].isChecked()
+        for name in STANDARDIZE_PARAM_NAMES:
+            self._advanced_widgets[name].setEnabled(standardize_on)
+
     def _browse_model_path(self, line_edit):
         path, _ = QFileDialog.getOpenFileName(self, "Select model file")
         if path:
@@ -514,6 +526,8 @@ class MainWindow(QMainWindow):
                 widget = QSpinBox()
                 widget.setMinimum(kwargs.get("minimum", 0))
                 widget.setMaximum(kwargs.get("maximum", 1_000_000))
+                if "specialValueText" in kwargs:
+                    widget.setSpecialValueText(kwargs["specialValueText"])  # shown at the minimum (0)
                 widget.setValue(default)
             else:  # float
                 widget = QDoubleSpinBox()
@@ -525,6 +539,8 @@ class MainWindow(QMainWindow):
 
             form.addRow(name, widget)
             self._advanced_widgets[name] = widget
+            if name == "standardize_audio":
+                widget.toggled.connect(self._sync_stage_widgets)
 
         return group
 

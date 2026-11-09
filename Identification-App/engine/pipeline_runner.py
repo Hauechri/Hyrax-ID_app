@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 
 from hyrax_id.audio_io import collect_wav_files
+from hyrax_id.audio_standardize import DEFAULT_SILENCE_THRESHOLD, standardize_files
 from hyrax_id.config import SPEAKER_LIST, SR  # noqa: F401  (re-exported)
 from hyrax_id.pipeline import run_pipeline
 from hyrax_id.preprocess import PreprocessConfig, PreprocessConfigError, find_settings_for_weights
@@ -148,6 +149,11 @@ def run_batch(
     preprocess=None,
     window_overlap_percent=None,
     detector_peak_normalize=True,
+    standardize_audio=True,
+    target_sample_rate=SR,
+    audio_workers=None,
+    silence_threshold=DEFAULT_SILENCE_THRESHOLD,
+    standardized_dir=None,
     debug_image_dir=None,
     debug_max_images=50,
     **param_overrides,
@@ -169,6 +175,13 @@ def run_batch(
     PreprocessConfig instead. window_overlap_percent: None -> the settings file's value, else 50.
     detector_peak_normalize: see run_pipeline. debug_image_dir: if set, the first `debug_max_images`
     detector input images are saved there.
+
+    standardize_audio: first write mono / target_sample_rate / 16-bit copies of the input recordings
+    (see hyrax_id/audio_standardize.py) and run the pipeline on those, so 44.1 kHz files or stereo files with
+    one live channel just work. The originals are never modified. The copies go to a temporary folder that is
+    removed afterwards, or to `standardized_dir` (kept; use a dedicated folder, the pipeline processes every .wav in it) if given.
+    audio_workers: parallel files (None/0 = auto).
+    silence_threshold: a channel whose peak is below it counts as silent.
     """
     if denoise and not denoiser_model_path:
         raise ValueError("Denoising is enabled but no denoiser model path was given.")
@@ -188,16 +201,38 @@ def run_batch(
     params = {**DEFAULT_PARAMS, **param_overrides}
     audio_path = Path(audio_path)
 
-    staging_dir = None
+    if audio_path.is_file():
+        sources = {audio_path.stem: str(audio_path)}
+    elif audio_path.is_dir():
+        sources = collect_wav_files(str(audio_path))
+    else:
+        raise FileNotFoundError(f"No such file or folder: {audio_path}")
+
+    if standardize_audio and target_sample_rate not in (preprocess.sample_rate, SR):
+        print(f"[WARN] Target sample rate {target_sample_rate} Hz differs from the detector's "
+              f"{preprocess.sample_rate} Hz and the classifier's {SR} Hz; they will resample again.")
+
+    work_dir, cleanup_dir = None, None
     try:
-        if audio_path.is_file():
-            staging_dir = tempfile.mkdtemp(prefix="hyraxid_input_")
-            shutil.copy2(audio_path, os.path.join(staging_dir, audio_path.name))
-            folder = staging_dir
-        elif audio_path.is_dir():
-            folder = str(audio_path)
+        if standardize_audio:
+            if standardized_dir:
+                work_dir = str(standardized_dir)
+            else:
+                work_dir = cleanup_dir = tempfile.mkdtemp(prefix="hyraxid_audio_")
+            summary = standardize_files(sources, work_dir, target_sample_rate, audio_workers,
+                                        silence_threshold, cancel_event)
+            if summary.cancelled:
+                print("[INFO] Cancelled.")
+                return
+            if summary.n_ok == 0:
+                raise RuntimeError("None of the audio files could be standardized -- see the log for the reasons.")
+            folder = work_dir
+        elif audio_path.is_file():
+            cleanup_dir = tempfile.mkdtemp(prefix="hyraxid_input_")
+            shutil.copy2(audio_path, os.path.join(cleanup_dir, audio_path.name))
+            folder = cleanup_dir
         else:
-            raise FileNotFoundError(f"No such file or folder: {audio_path}")
+            folder = str(audio_path)
 
         run_pipeline(
             Detector_model_path=str(detector_model_path),
@@ -220,5 +255,5 @@ def run_batch(
             **params,
         )
     finally:
-        if staging_dir is not None:
-            shutil.rmtree(staging_dir, ignore_errors=True)
+        if cleanup_dir is not None:
+            shutil.rmtree(cleanup_dir, ignore_errors=True)
