@@ -13,9 +13,9 @@ from PySide6.QtCore import QObject, Signal
 
 from pipeline_runner import run_batch, parse_bout_results, list_input_stems
 
-# Matches HYRAX_ID_predict.py's per-window detector progress line:
-# print(f"  - Slice {slice_index + 1}/{len(slices)}", end='\r')
-SLICE_PROGRESS_RE = re.compile(r"^\s*-\s*Slice\s+(\d+)/(\d+)\s*$")
+# Matches the detector's per-batch progress line ("  - Windows 16/48", written with end="\r"; "Windows 0/48"
+# is printed when a file's detector pass starts).
+SLICE_PROGRESS_RE = re.compile(r"^\s*-\s*Windows\s+(\d+)/(\d+)\s*$")
 
 
 class QtLogStream(io.TextIOBase):
@@ -92,10 +92,10 @@ class InferenceWorker(QObject):
 
         for stem in list_input_stems(audio_path):
             label_path = os.path.join(output_path, f"{stem}_labels.txt")
-            # run_pipeline() only writes a labels file when it found at
-            # least one bout; a missing file means "no bouts detected",
-            # not "this file wasn't processed" (list_input_stems already
-            # limits us to files this run actually submitted).
+            # run_pipeline() writes an empty labels file when it found no
+            # bouts, so an empty (or, if the file was skipped, missing) file
+            # means "no bouts detected" (list_input_stems already limits us to
+            # files this run actually submitted).
             bouts = parse_bout_results(label_path) if os.path.isfile(label_path) else []
 
             if not bouts:
