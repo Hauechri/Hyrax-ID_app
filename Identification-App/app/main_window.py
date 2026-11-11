@@ -45,12 +45,15 @@ from PySide6.QtWidgets import (
     QTableView,
     QVBoxLayout,
     QWidget,
+    QTabWidget,
 )
 
 import paths
 from hyrax_id.preprocess import PreprocessConfig, PreprocessConfigError, find_settings_for_weights
 from hyrax_id.speakers import SpeakerList, SpeakerListError, find_speaker_list_for_weights
 from results_model import COLUMNS, ResultsModel
+from spectrogram_tab import CFG_SECTION as SPECTROGRAM_SECTION
+from spectrogram_tab import SpectrogramTab
 from worker import InferenceWorker
 
 # Advanced pipeline parameters exposed in the UI, matching
@@ -105,7 +108,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Hyrax-ID")
-        self.resize(1150, 660)
+        self.resize(1280, 760)
 
         self._thread = None
         self._worker = None
@@ -123,13 +126,35 @@ class MainWindow(QMainWindow):
         self._stage_checkboxes = {}  # stage key ("denoise"/"classify") -> QCheckBox
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        self.setCentralWidget(splitter)
 
         splitter.addWidget(self._build_controls_panel())
         splitter.addWidget(self._build_log_panel())
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
         splitter.setSizes([380, 770])
+
+        # Tab 1: detection / identification (everything above). Tab 2: spectrograms + Praat measurements of
+        # the results. Both are saved in the same .cfg file.
+        self.spectrogram_tab = SpectrogramTab(
+            get_detection_paths=self._detection_paths,
+            on_load_settings=self._load_config,
+            on_save_settings=self._save_config,
+        )
+        self.tabs = QTabWidget()
+        self.tabs.addTab(splitter, "Detection / Identification")
+        self.tabs.addTab(self.spectrogram_tab, "Spectrogram viewer")
+        self.setCentralWidget(self.tabs)
+
+    def _detection_paths(self):
+        """(recordings folder, results folder) as currently set in the detection tab, for the viewer tab."""
+        audio = self.input_path_edit.text().strip()
+        if audio and os.path.isfile(audio):
+            audio = os.path.dirname(audio)  # single-file mode: the file's folder
+        return audio, self.output_path_edit.text().strip()
+
+    def closeEvent(self, event):
+        self.spectrogram_tab.shutdown()
+        super().closeEvent(event)
 
     # -- left: controls panel --------------------------------------------
 
@@ -208,6 +233,8 @@ class MainWindow(QMainWindow):
         cfg = configparser.ConfigParser()
         cfg[CFG_SECTION] = {}
         section = cfg[CFG_SECTION]
+        if self.spectrogram_tab.available:
+            cfg[SPECTROGRAM_SECTION] = self.spectrogram_tab.get_settings()
 
         section["input_mode"] = "single_file" if self.single_file_radio.isChecked() else "folder"
         section["input_path"] = self.input_path_edit.text()
@@ -299,6 +326,10 @@ class MainWindow(QMainWindow):
                     widget.setValue(section.getfloat(name))
             except ValueError:
                 continue  # leave that one field at its current value
+
+        # The viewer tab lives in the same file; older .cfg files simply have no such section.
+        if SPECTROGRAM_SECTION in cfg:
+            self.spectrogram_tab.set_settings(dict(cfg[SPECTROGRAM_SECTION]))
 
         self.status_label.setText(f"Settings loaded from {path}")
 
@@ -877,4 +908,5 @@ class MainWindow(QMainWindow):
             self._thread.quit()
             self._thread.wait()
         self._worker = None
-        self._thread = None
+        self._thread = None
+        self.spectrogram_tab.notify_detection_finished()

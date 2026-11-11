@@ -12,6 +12,7 @@ from pathlib import Path
 from hyrax_id.audio_io import collect_wav_files
 from hyrax_id.audio_standardize import DEFAULT_SILENCE_THRESHOLD, standardize_files
 from hyrax_id.config import SR
+from hyrax_id.labels_io import parse_bout_results  # noqa: F401  (re-exported; the parser lives in labels_io)
 from hyrax_id.pipeline import run_pipeline
 from hyrax_id.preprocess import PreprocessConfig, PreprocessConfigError, find_settings_for_weights
 from hyrax_id.speakers import SpeakerList, SpeakerListError, find_speaker_list_for_weights
@@ -82,72 +83,6 @@ def list_input_stems(audio_path):
     if audio_path.is_file():
         return [audio_path.stem]
     return sorted(collect_wav_files(str(audio_path)).keys())
-
-
-def parse_bout_results(label_path):
-    """
-    Parse a *_labels.txt file written by run_pipeline() into structured bout
-    dicts: [{"bout_id", "start", "end", "animal", "confidence", "elements": [...]}, ...]
-
-    If the run had classification disabled, bout headers are just "BOUT{n}"
-    with no animal/confidence; those bouts come back with animal=None and
-    confidence=None.
-
-    NOTE: HYRAX_ID_predict.py's own parse_annotation_file()/assign_elements_to_bouts()
-    target an older ground-truth label format ("BOUT_1", no animal/confidence
-    suffix) and raise ValueError on the pipeline's actual output format
-    ("BOUT1_{animal}_{conf}") -- confirmed by inspection, not assumption.
-    This parses the real output format instead.
-
-    Relies on save_full_audacity_labels() always writing each bout's element
-    lines immediately after that bout's own header line (true because a
-    bout's start time ties with its first element's start time, and Python's
-    stable sort preserves the original append order on ties) -- verified
-    against real pipeline output.
-    """
-    bouts = []
-    current = None
-    with open(label_path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                start_s, end_s, label = line.split("\t")
-                start, end = float(start_s), float(end_s)
-                if label.startswith("BOUT"):
-                    # "BOUT{n}_{animal}_{conf}": the animal name may itself contain underscores, so the
-                    # id is split off from the left and the confidence from the right.
-                    parts = label[len("BOUT"):].split("_", 1)
-                    if len(parts) == 2:
-                        bout_id_s = parts[0]
-                        animal, conf_s = parts[1].rsplit("_", 1)
-                        confidence = float(conf_s)
-                    else:
-                        # classification was disabled: bare "BOUT{n}"
-                        bout_id_s, animal, confidence = parts[0], None, None
-                    current = {
-                        "bout_id": int(bout_id_s),
-                        "start": start,
-                        "end": end,
-                        "animal": animal,
-                        "confidence": confidence,
-                        "elements": [],
-                    }
-                    bouts.append(current)
-                elif current is not None:
-                    elem_type, conf_s = label.rsplit("_", 1)
-                    current["elements"].append(
-                        {"start": start, "end": end, "type": elem_type, "confidence": float(conf_s)}
-                    )
-            except ValueError:
-                # Defensive only: a line that doesn't match this run's own
-                # output format (e.g. this file wasn't actually written by
-                # save_full_audacity_labels). list_input_stems() is the real
-                # fix for not reading stray files in the first place; this
-                # just keeps one bad line from losing the whole file's results.
-                continue
-    return bouts
 
 
 def run_batch(

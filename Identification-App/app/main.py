@@ -4,6 +4,7 @@ Hyrax-ID desktop app entry point.
 Run with:
     .venv\\Scripts\\python.exe app\\main.py
 """
+import multiprocessing
 import os
 import sys
 
@@ -15,14 +16,19 @@ from paths import user_data_dir  # noqa: E402
 
 os.environ.setdefault("NUMBA_CACHE_DIR", os.path.join(user_data_dir(), "numba_cache"))
 
-from PySide6.QtWidgets import QApplication  # noqa: E402
-from PySide6.QtGui import QIcon  # noqa: E402
-
-import paths  # noqa: E402
-from main_window import MainWindow  # noqa: E402
-
 
 def main():
+    # The spectrogram viewer's batch runs on worker *processes*. On Windows (and in a frozen exe) a worker
+    # starts by re-importing this module, so everything heavy -- Qt, the whole GUI and with it torch -- is
+    # imported here, inside main(), and not at module level: a worker then only needs the light top part.
+    multiprocessing.freeze_support()
+
+    from PySide6.QtGui import QIcon
+    from PySide6.QtWidgets import QApplication
+
+    import paths
+    from main_window import MainWindow
+
     app = QApplication(sys.argv)
     icon_path = os.path.join(paths.ASSETS_DIR, "icon.ico")
     if os.path.exists(icon_path):

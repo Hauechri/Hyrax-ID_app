@@ -169,7 +169,9 @@ def _load_models(speakers, state_error=None):
     import hyrax_id.pipeline as P
     cls = MagicMock()
     cls.return_value.load_state_dict.side_effect = state_error
-    sys.modules["model_ECAPATDNN"] = types.SimpleNamespace(ECAPATDNNBoutModel=cls)
+    fake = types.SimpleNamespace(ECAPATDNNBoutModel=cls)
+    sys.modules["hyrax_id.model_ECAPATDNN"] = fake      # tried first (the file lives in hyrax_id/)
+    sys.modules["model_ECAPATDNN"] = fake               # fallback for the older engine/ layout
     P.joblib = MagicMock(); P.joblib.load.return_value = {"model": None, "feature_keys": []}
     P.YoloDetector = lambda *a, **k: MagicMock(names={0: "chuck", 1: "wail", 2: "snort"}, trained_imgsz=980)
     from hyrax_id.preprocess import PreprocessConfig

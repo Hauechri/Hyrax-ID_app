@@ -1,0 +1,25 @@
+{
+  "name": "current",
+  "note": "Class index i of the ECAPA-TDNN classifier = speakers[i]. Keep this order identical to the order used when the classifier was trained (alphabetical, as the app's code always did: sorted(...)).",
+  "speakers": [
+    "Bachelor-cut-in-40",
+    "Bachelor-earing-40-tear-1",
+    "Bachelor-tear-20-40",
+    "FB",
+    "H1",
+    "MS",
+    "New-resident-in-David-never-caught",
+    "No-ear-resident",
+    "No-ear-sukkot-bachelor",
+    "PA",
+    "PS",
+    "QY",
+    "R1",
+    "SN",
+    "Unknow",
+    "WX",
+    "X2",
+    "X3",
+    "Z2"
+  ]
+}

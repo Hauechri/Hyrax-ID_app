@@ -1,0 +1,5 @@
+# Extra packages of the "Spectrogram viewer" tab (on top of what the detection tab already needs:
+# numpy, scipy, soundfile, PySide6, ...). Without them the tab shows this list and the rest of the app works.
+matplotlib
+pandas
+praat-parselmouth

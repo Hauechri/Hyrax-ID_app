@@ -68,7 +68,10 @@ def load_models(*, detector_path, garbage_path, classifier_path, denoiser_path, 
 
     classifier = None
     if classify:
-        from model_ECAPATDNN import ECAPATDNNBoutModel
+        try:
+            from .model_ECAPATDNN import ECAPATDNNBoutModel   # lives next to this module
+        except ImportError:                                   # older layout: engine/model_ECAPATDNN.py
+            from model_ECAPATDNN import ECAPATDNNBoutModel
         classifier = ECAPATDNNBoutModel(num_classes=len(speakers), input_dim=input_dim, emb_dim=emb_dim)
         try:
             classifier.load_state_dict(torch.load(classifier_path, map_location=device))
