@@ -9,7 +9,7 @@ from .audio_io import load_audio_segment
 def waveform_to_logmel(
     waveform,
     sr=48000,
-    n_mels=64,
+    n_mels=96,
     n_fft=1024,
     hop_length=144,  # 3 ms at 48kHz
     win_length=1024,

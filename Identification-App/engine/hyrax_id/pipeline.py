@@ -117,7 +117,7 @@ def run_pipeline(
     GB_threshold,
     GB_scoreweight,
     speakers: SpeakerList | None = None,
-    input_dim=64,
+    input_dim=96,
     emb_dim=192,
     window_overlap_percent=None,
     detector_iou=None,
